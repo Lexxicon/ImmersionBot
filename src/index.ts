@@ -88,6 +88,7 @@ async function findCategories(guild:Guild){
 async function mentor(msg: Message & {guild: Guild}){
     if(msg.member?.roles.cache.find(role => role.name == CONFIG.student_role)){
         msg.channel.send(`You are already a ${CONFIG.student_role}!`);
+        findUser(msg);
         return;
     }
     let mentorRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
@@ -338,12 +339,13 @@ bot.on('message', async msg => {
         }
         let command = msg.content.substr(1);
         if(hasGuild(msg)){
+            const mentorCMD = `${CONFIG.mentor_role}`.toLowerCase();
             log.info(`processing ${command} from ${msg.member?.displayName}`);
-            switch(command.split(' ')[0]){
+            switch(command.split(' ')[0].toLowerCase()){
                 case 'init':
                     initGuild(msg);
                     break;
-                case 'mentor':
+                case mentorCMD:
                     mentor(msg);
                     break;
                 case 'rename':
@@ -358,13 +360,15 @@ bot.on('message', async msg => {
                 case 'help':
                     let cmds: string[] = [];
                     cmds.push('Commands');
-                    cmds.push('!mentor <category> <nation> -- create a mentor channel for yourself');
-                    cmds.push('!rename <category> <nation> -- rename your mentor channel (must be done within your mentor channel)');
+                    cmds.push('```');
+                    cmds.push(`!${mentorCMD} <category> <nation> -- create a ${mentorCMD} channel for yourself`);
+                    cmds.push(`!rename <category> <nation> -- rename your ${mentorCMD} channel (must be done within your ${mentorCMD} channel)`);
                     cmds.push('!find -- find your channel');
                     if(msg.member?.roles.cache.find(r => r.name == CONFIG.mentor_role) != null){
-                        cmds.push('!fine <@user> -- find mentor channels for a user');
-                        cmds.push('!stales <time: 1d> -- limit 50 channels');
+                        cmds.push(`[${CONFIG.mentor_role} only] !fine <@user> -- find ${mentorCMD} channel(s) for a user`);
+                        cmds.push(`[${CONFIG.mentor_role} only] !stales <optional time: 1d> -- limit 50 channels`);
                     }
+                    cmds.push('```');
                     msg.channel.send(`${cmds.join('\n')}`);
             }
         }
