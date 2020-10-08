@@ -1,8 +1,9 @@
 require('dotenv').config();
 require('source-map-support').install();
 
-import {CategoryChannel, Client, Guild, GuildChannel, Message, Snowflake} from 'discord.js';
-import { find, keys, over } from 'lodash';
+import {CategoryChannel, Client, Guild, GuildChannel, GuildEmoji, Message, MessageManager, Snowflake, TextChannel} from 'discord.js';
+import dateFormat from 'dateformat';
+import { find, keys, last, over } from 'lodash';
 import { getLogger, shutdown } from 'log4js';
 
 const log = getLogger();
@@ -27,6 +28,25 @@ export function getDiscordBot(){
 function cleanup(){
     log.info('Goodbye');
     shutdown();
+}
+
+
+const SEC_IN_MIN = 60;
+const SEC_IN_HOUR = SEC_IN_MIN * 60;
+const SEC_IN_DAY = SEC_IN_HOUR * 24;
+
+function getSeconds(str: string) {
+    if(str.startsWith('-')) throw `Negative times aren't allowed! ${str}`
+    let seconds = 0;
+    let days = str.match(/(\d+)\s*d/);
+    let hours = str.match(/(\d+)\s*h/);
+    let minutes = str.match(/(\d+)\s*m/);
+    let rawSeconds = str.match(/(\d+)\s*s/);
+    if (days) { seconds += parseInt(days[1])*SEC_IN_DAY; }
+    if (hours) { seconds += parseInt(hours[1])*SEC_IN_HOUR; }
+    if (minutes) { seconds += parseInt(minutes[1])*SEC_IN_MIN; }
+    if (rawSeconds) { seconds += parseInt(rawSeconds[1]); }
+    return seconds;
 }
 
 // do app specific cleaning before exiting
@@ -136,8 +156,9 @@ async function initGuild(msg: Message & {guild:Guild}){
         changed = true;
     }
     if(!roleManager.cache.find(role => role.name == CONFIG.mentor_role)){
-        await roleManager.create({data: {name: CONFIG.mentor_role, mentionable: false, permissions: 0}});
+        let mentorRole = await roleManager.create({data: {name: CONFIG.mentor_role, mentionable: false, permissions: 0}});
         changed = true;
+        msg.guild.me?.roles.add(mentorRole);
     }
     let categoryRole = roleManager.cache.find(role => role.name == CONFIG.mentor_category);
     if(!categoryRole){
@@ -154,28 +175,73 @@ function hasGuild( obj: any ): obj is {guild:Guild} {
     return 'guild' in obj;
 }
 
+function hasMessages( obj: any ): obj is {messages: MessageManager}{
+    return 'messages' in obj;
+}
+
 async function findStales(msg:Message&{guild:Guild}){
-    let role = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.student_role);
+    let role = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
     if(!role){
-        msg.channel.send(`Server has no ${CONFIG.mentor_role}[mentor] role!`);
+        await msg.channel.send(`Server has no ${CONFIG.mentor_role}[mentor] role!`);
         return;
     }
-    let stales: string[] = [];
+
+    let lastTalkThreashold: Date | null = null;
+
+    if(msg.content.split(' ').length > 1){
+        let rawTime = msg.content.split(' ').slice(1).join(' ');
+        let ms = getSeconds(rawTime) * 1000;
+        lastTalkThreashold = new Date();
+        lastTalkThreashold.setTime(lastTalkThreashold.getTime() - ms);
+    }
+
+    log.info(`${lastTalkThreashold}`);
+
+    let onlyMentors: string[] = [];
+    let idle: string[] = [];
+
     let categories = await findCategories(msg.guild);
     for(let parentCategory in categories){
         let subcategorys = categories[parentCategory];
         for(let subcategory of subcategorys){
+            let channels: GuildChannel[] & {messages:MessageManager}[] = [];
             subcategory.children.each(channel => {
-                if(channel.members.find(member => member.roles.cache.find(r => r.id == role?.id) == null)){
-                    stales.push(channel.toString());
+                let foundOnlyMentors = true;
+                channel.members.each(member => {
+                    if(member.user.id == bot.user?.id) return;
+                    if(member.roles.cache.find(r => r.id == role!.id) == null){
+                        foundOnlyMentors = false;
+                    }
+                });
+                if(foundOnlyMentors){
+                    onlyMentors.push(channel.toString());
+                }else if(lastTalkThreashold && hasMessages(channel) ) {
+                    channels.push(channel);
                 }
             });
+            if(lastTalkThreashold){
+                for(let channel of channels){
+                    try{
+                        let messages = await channel.messages.fetch({limit: 1});
+                        let m = messages.random();
+                        if(!m || m.createdTimestamp < lastTalkThreashold.getTime()){
+                            idle.push(channel.toString());
+                        }
+                    }catch(err){
+                        log.error(err);
+                    }
+                }
+            }
         }
     }
-    if(stales.length > 0){
-        msg.channel.send(stales.slice(0, Math.min(50, stales.length)).join('\n'));
-    }else{
-        msg.channel.send(`No stale channels found`);
+    if(onlyMentors.length > 0){
+        await msg.channel.send(`Only ${role.name}:\n${onlyMentors.slice(0, Math.min(50, onlyMentors.length)).join('\n')}`);
+    }
+    if(idle.length > 0){
+        await msg.channel.send(`Idle since ${dateFormat(lastTalkThreashold, 'yyyy-mm-dd HH:MM')}:\n${idle.slice(0, Math.min(50, idle.length)).join('\n')}`);
+    }
+    if(onlyMentors.length == 0 && idle.length == 0){
+        await msg.channel.send(`No stale channels found`);
     }
 }
 
@@ -190,6 +256,7 @@ bot.on('message', async msg => {
         }
         let command = msg.content.substr(1);
         if(hasGuild(msg)){
+            log.info(`processing ${command} from ${msg.member?.displayName}`);
             switch(command.split(' ')[0]){
                 case 'init':
                     initGuild(msg);
