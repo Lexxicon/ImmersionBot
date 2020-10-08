@@ -1,0 +1,34 @@
+{
+    "appenders": {
+        "console": {
+          "type": "console", 
+          "level": "info",
+          "layout": {
+            "type": "pattern", 
+            "pattern": "%d %p %c %f{2}:%l %m"
+          }
+        },
+        "consoleFilter":{
+          "type": "logLevelFilter",
+          "level": "INFO",
+          "appender": "console"
+        },
+        "file": { 
+            "type": "dateFile", 
+            "filename": "output.log", 
+            "pattern": ".yyyy-MM-dd", 
+            "daysToKeep": 7,
+            "layout": {
+              "type": "pattern", 
+              "pattern": "%d %p %c %f{2}:%l %m"
+            }
+        }
+      },
+      "categories": {
+        "default": { 
+            "appenders": ["consoleFilter", "file"], 
+            "level": "debug", 
+            "enableCallStack": true 
+        }
+      }
+}
