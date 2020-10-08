@@ -271,6 +271,62 @@ async function findUser(msg:Message&{guild:Guild}){
     await msg.channel.send(`Found: ${found.join(' ')}`);
 }
 
+async function rename(msg:Message&{guild:Guild}){
+    let parts = msg.content.split(' ');
+    if(parts.length < 3){
+        msg.channel.send(`Please format the request in \`!mentor <ERA> <NATION>\``);
+        return;
+    }
+
+    let mentorRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
+    if(!mentorRole) {
+        msg.channel.send(`Guild is missing ${CONFIG.mentor_role} role!`);
+        return;
+    }
+
+    let channel = msg.channel as GuildChannel;
+    let categories = await findCategories(msg.guild);
+    let isInCategory = false;
+    for(let group in categories){
+        for(let category of categories[group]){
+            if(channel.parentID == category.id){
+                isInCategory = true;
+            }
+        }
+    }
+    if(!isInCategory){
+        log.debug(`Requested to rename channel not in category: ${channel.name}`);
+        return;
+    }
+    let targetChannel = msg.channel as GuildChannel;
+    if(channel.permissionOverwrites.find((perm, key) => key == msg.author.id) == null){
+        log.debug(`Non owner requested rename of un authorized channel. ${msg.member?.displayName}, ${targetChannel.name}`)
+    }
+
+    let categoryName = parts[1].toLowerCase();
+    if(!categories[categoryName]){
+        msg.channel.send(`Unrecognized era! Recognized Eras: ${keys(categories).join(' ')}`);
+        return;
+    }
+    let category:CategoryChannel | null = null;
+    for(let channel of categories[categoryName]){
+        if(channel.children.size < 50){
+            category = channel;
+            break;
+        }
+    }
+    if(category == null){
+        msg.channel.send(`Out of room for ${categoryName}! Ask some one to make more!`);
+        return;
+    }
+    let nation = parts.splice(2).join('');
+
+    await targetChannel.edit({
+        parentID: category.id,
+        name: `${msg.member?.displayName}-${nation}`
+    });
+}
+
 bot.on('ready', () => {
     log.info(`Logged in as ${bot?.user?.tag}!`);
 });
@@ -290,15 +346,26 @@ bot.on('message', async msg => {
                 case 'mentor':
                     mentor(msg);
                     break;
+                case 'rename':
+                    rename(msg);
+                    break;
                 case 'find':
                     findUser(msg);
                     break;
                 case 'stales':
                     findStales(msg);
                     break;
-                case 'echo':
-                    msg.channel.send(msg.channel.toString());
-                    break;
+                case 'help':
+                    let cmds: string[] = [];
+                    cmds.push('Commands');
+                    cmds.push('!mentor <category> <nation> -- create a mentor channel for yourself');
+                    cmds.push('!rename <category> <nation> -- rename your mentor channel (must be done within your mentor channel)');
+                    cmds.push('!find -- find your channel');
+                    if(msg.member?.roles.cache.find(r => r.name == CONFIG.mentor_role) != null){
+                        cmds.push('!fine <@user> -- find mentor channels for a user');
+                        cmds.push('!stales <time: 1d> -- limit 50 channels');
+                    }
+                    msg.channel.send(`${cmds.join('\n')}`);
             }
         }
     }catch(err){
