@@ -186,6 +186,10 @@ async function findStales(msg:Message&{guild:Guild}){
         return;
     }
 
+    if(msg.member?.roles.cache.find(r => r.id == role?.id) == null){
+        msg.channel.send(`Only mentors can use this`);
+        return ;
+    }
     let lastTalkThreashold: Date | null = null;
 
     if(msg.content.split(' ').length > 1){
@@ -245,6 +249,28 @@ async function findStales(msg:Message&{guild:Guild}){
     }
 }
 
+async function findUser(msg:Message&{guild:Guild}){
+    let userID = msg.author.id;
+    let mentionedUser = msg.mentions.users.random();
+    if(mentionedUser && msg.member?.roles.cache.find(role => role.name == CONFIG.mentor_role)){
+        userID = mentionedUser.id;
+    }
+
+    let categories = await findCategories(msg.guild);
+    let found: string[] = [];
+    for(let parentCategory in categories){
+        let subcategorys = categories[parentCategory];
+        for(let subcategory of subcategorys){
+            let channels: GuildChannel[] & {messages:MessageManager}[] = [];
+            subcategory.children.filter(channel => channel.permissionOverwrites.find((perm, key) => key == userID) != null).each(c => channels.push(c));
+            for(let c of channels){
+                found.push(c.toString());
+            }
+        }
+    }
+    await msg.channel.send(`Found: ${found.join(' ')}`);
+}
+
 bot.on('ready', () => {
     log.info(`Logged in as ${bot?.user?.tag}!`);
 });
@@ -265,7 +291,7 @@ bot.on('message', async msg => {
                     mentor(msg);
                     break;
                 case 'find':
-                    msg.channel.send('You must find yourself first!');
+                    findUser(msg);
                     break;
                 case 'stales':
                     findStales(msg);
