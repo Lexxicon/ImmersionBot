@@ -338,14 +338,16 @@ async function DRN(msg: Message&{guild:Guild}){
         await msg.channel.send(`Server has no ${CONFIG.mentor_role}[mentor] role!`);
         return;
     }
-    let isMentor = msg.member?.roles.cache.find(r => r.id == role?.id) == null;
+    let isMentor = msg.member?.roles.cache.find(r => r.id == role?.id) != null;
     let targetChannel = msg.channel as GuildChannel;
     if(!isMentor && targetChannel.permissionOverwrites.find((perm, key) => key == msg.author.id) == null){
+        log.info(`Insufficient permissions to use DRN here`);
         return;
     }
 
     const DRN_REGEX = /(?<ATK>\d+)\s*vs?\s*(?<DEF>\d+)/;
     let match = DRN_REGEX.exec(msg.content);
+
     function drn(depth: number){
         if(depth > 20) return 10000;
         let roll = Math.ceil(Math.random() * 6);
@@ -354,6 +356,7 @@ async function DRN(msg: Message&{guild:Guild}){
         }
         return roll;
     }
+
     if(match && match?.groups){
         let atk = Number(match.groups['ATK']);
         let def = Number(match.groups['DEF']);
@@ -434,12 +437,16 @@ bot.on('message', async msg => {
                 case 'stales':
                     findStales(msg);
                     break;
+                case 'drn':
+                    DRN(msg);
+                    break;
                 case 'help':
                     let cmds: string[] = [];
                     cmds.push('Commands');
                     cmds.push('```');
                     cmds.push(`!${mentorCMD} <category> <nation> -- create a ${mentorCMD} channel for yourself`);
                     cmds.push(`!rename <category> <nation> -- rename your ${mentorCMD} channel (must be done within your ${mentorCMD} channel)`);
+                    cmds.push(`!drn <number> vs <number> -- generate stats for an opposed 2drn vs 2drn check (only works in your ${mentorCMD} channel)`);
                     cmds.push('!find -- find your channel');
                     if(msg.member?.roles.cache.find(r => r.name == CONFIG.mentor_role) != null){
                         cmds.push(`[${CONFIG.mentor_role} only] !fine <@user> -- find ${mentorCMD} channel(s) for a user`);
