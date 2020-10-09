@@ -5,6 +5,8 @@ import {CategoryChannel, Client, Guild, GuildChannel, GuildEmoji, Message, Messa
 import dateFormat from 'dateformat';
 import { find, keys, last, over } from 'lodash';
 import { getLogger, shutdown } from 'log4js';
+import AsciiTable from 'ascii-table';
+import AsciiChart from 'asciichart';
 
 const log = getLogger();
 
@@ -302,6 +304,7 @@ async function rename(msg:Message&{guild:Guild}){
     let targetChannel = msg.channel as GuildChannel;
     if(channel.permissionOverwrites.find((perm, key) => key == msg.author.id) == null){
         log.debug(`Non owner requested rename of un authorized channel. ${msg.member?.displayName}, ${targetChannel.name}`)
+        return;
     }
 
     let categoryName = parts[1].toLowerCase();
@@ -326,6 +329,80 @@ async function rename(msg:Message&{guild:Guild}){
         parentID: category.id,
         name: `${msg.member?.displayName}-${nation}`
     });
+}
+
+
+async function DRN(msg: Message&{guild:Guild}){
+    let role = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
+    if(!role){
+        await msg.channel.send(`Server has no ${CONFIG.mentor_role}[mentor] role!`);
+        return;
+    }
+    let isMentor = msg.member?.roles.cache.find(r => r.id == role?.id) == null;
+    let targetChannel = msg.channel as GuildChannel;
+    if(!isMentor && targetChannel.permissionOverwrites.find((perm, key) => key == msg.author.id) == null){
+        return;
+    }
+
+    const DRN_REGEX = /(?<ATK>\d+)\s*vs?\s*(?<DEF>\d+)/;
+    let match = DRN_REGEX.exec(msg.content);
+    function drn(depth: number){
+        if(depth > 20) return 10000;
+        let roll = Math.ceil(Math.random() * 6);
+        if(roll == 6){
+            return 5 + drn(depth++);
+        }
+        return roll;
+    }
+    if(match && match?.groups){
+        let atk = Number(match.groups['ATK']);
+        let def = Number(match.groups['DEF']);
+        let result = {wins: 0, losses: 0, values: [] as number[]};
+        let count = 0;
+        let sum = 0;
+        while(count++ < 1000){
+            let atkDrn = drn(0) + drn(0) + atk;
+            let defDrn = drn(0) + drn(0) + def;
+            let roll = atkDrn - defDrn;
+            sum += roll;
+            result.values.push(roll);
+            if(roll > 0){
+                result.wins++;
+            }else{
+                result.losses++;
+            }
+        }
+        result.values = result.values.sort((a, b) => a - b);
+        let rolls = result.wins + result.losses;
+        
+        let zero: number[] = [];
+        let breakdown: number[] = [];
+        let granularity = 30;
+        for(let i = 0; i < granularity; i++){
+            zero[i] = 0;
+            let index = Math.floor((i/granularity) * result.values.length);
+            //exclude the lowest and highest rolls
+            index = Math.max(10, Math.min(result.values.length - 10, index));
+            breakdown[i] = result.values[index];
+        }
+        
+        let table = new AsciiTable(`${atk} vs ${def}`);
+        table.addRow('Rolls', rolls);
+        table.addRow('Wins', result.wins);
+        table.addRow('Losses', result.losses);
+        table.addRow('Avg', (sum/count).toFixed(2));
+        table.addRow('Win %', ((result.wins/rolls)*100).toFixed(2));
+
+        let tableStr = table.toString().split('\n') as string[];
+        let graph = AsciiChart.plot([zero, breakdown], {height: tableStr.length}).split('\n') as string[];
+        let output: string[] = [];
+        output.push('```');
+        for(let i = 0; i < tableStr.length; i++){
+            output.push(`${tableStr[i]} ${graph[i]}`);
+        }
+        output.push('```');
+        await msg.channel.send(`${output.join('\n')}`);
+    }
 }
 
 bot.on('ready', () => {
