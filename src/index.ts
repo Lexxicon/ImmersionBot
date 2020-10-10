@@ -1,12 +1,12 @@
 require('dotenv').config();
 require('source-map-support').install();
 
-import {CategoryChannel, Client, Guild, GuildChannel, GuildEmoji, Message, MessageManager, Snowflake, TextChannel} from 'discord.js';
-import dateFormat from 'dateformat';
-import { find, keys, last, over } from 'lodash';
-import { getLogger, shutdown } from 'log4js';
 import AsciiTable from 'ascii-table';
 import AsciiChart from 'asciichart';
+import dateFormat from 'dateformat';
+import { CategoryChannel, Client, Guild, GuildChannel, Message, MessageManager } from 'discord.js';
+import { keys } from 'lodash';
+import { getLogger, shutdown } from 'log4js';
 
 const log = getLogger();
 
@@ -20,8 +20,7 @@ require('./ValidateEnv.js').validate();
 
 
 const bot = new Client();
-const TOKEN = process.env.TOKEN;;
-const LOBBY_NAME = process.env.DEFAULT_LOBBY_NAME;
+const TOKEN = process.env.TOKEN;
 
 export function getDiscordBot(){
     return bot;
@@ -38,12 +37,12 @@ const SEC_IN_HOUR = SEC_IN_MIN * 60;
 const SEC_IN_DAY = SEC_IN_HOUR * 24;
 
 function getSeconds(str: string) {
-    if(str.startsWith('-')) throw `Negative times aren't allowed! ${str}`
+    if(str.startsWith('-')) throw `Negative times aren't allowed! ${str}`;
     let seconds = 0;
-    let days = str.match(/(\d+)\s*d/);
-    let hours = str.match(/(\d+)\s*h/);
-    let minutes = str.match(/(\d+)\s*m/);
-    let rawSeconds = str.match(/(\d+)\s*s/);
+    const days = str.match(/(\d+)\s*d/);
+    const hours = str.match(/(\d+)\s*h/);
+    const minutes = str.match(/(\d+)\s*m/);
+    const rawSeconds = str.match(/(\d+)\s*s/);
     if (days) { seconds += parseInt(days[1])*SEC_IN_DAY; }
     if (hours) { seconds += parseInt(hours[1])*SEC_IN_HOUR; }
     if (minutes) { seconds += parseInt(minutes[1])*SEC_IN_MIN; }
@@ -76,12 +75,12 @@ process.on('unhandledRejection', (reason: any, p) => {
 });
 
 async function findCategories(guild:Guild){
-    let roleManager = await guild.roles.fetch();
-    let categoryRole = roleManager.cache.find(role => role.name == CONFIG.mentor_category);
-    let categories: { [index: string]: CategoryChannel[] } = {};
+    const roleManager = await guild.roles.fetch();
+    const categoryRole = roleManager.cache.find(role => role.name == CONFIG.mentor_category);
+    const categories: { [index: string]: CategoryChannel[] } = {};
     guild.channels.cache.forEach(channel => {   
         if(channel.type == "category" && categoryRole?.id && channel.permissionOverwrites.find(overwrite => overwrite.id == categoryRole?.id)){
-            let category = channel.name.split(' ')[0].toLowerCase();
+            const category = channel.name.split(' ')[0].toLowerCase();
             if(!categories[category]){ 
                 categories[category] = [];
             }
@@ -93,44 +92,44 @@ async function findCategories(guild:Guild){
 
 async function mentor(msg: Message & {guild: Guild}){
     if(msg.member?.roles.cache.find(role => role.name == CONFIG.student_role)){
-        msg.channel.send(`You are already a ${CONFIG.student_role}!`);
-        findUser(msg);
+        await msg.channel.send(`You are already a ${CONFIG.student_role}!`);
+        await findUser(msg);
         return;
     }
-    let mentorRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
+    const mentorRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
     if(!mentorRole){
-        msg.channel.send(`Server has no ${CONFIG.mentor_role}[mentor] role!`);
+        await msg.channel.send(`Server has no ${CONFIG.mentor_role}[mentor] role!`);
         return;
     }
-    let studentRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.student_role);
+    const studentRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.student_role);
     if(!studentRole){
-        msg.channel.send(`Server has no ${CONFIG.student_role}[student] role!`);
+        await msg.channel.send(`Server has no ${CONFIG.student_role}[student] role!`);
         return;
     }
-    let parts = msg.content.split(' ');
+    const parts = msg.content.split(' ');
     if(parts.length < 3){
-        msg.channel.send(`Please format the request in \`!mentor <ERA> <NATION>\``);
+        await msg.channel.send(`Please format the request in \`!mentor <ERA> <NATION>\``);
         return;
     }
-    let categoryName = parts[1].toLowerCase();
-    let categories = await findCategories(msg.guild);
+    const categoryName = parts[1].toLowerCase();
+    const categories = await findCategories(msg.guild);
     if(!categories[categoryName]){
-        msg.channel.send(`Unrecognized era! Recognized Eras: ${keys(categories).join(' ')}`);
+        await msg.channel.send(`Unrecognized era! Recognized Eras: ${keys(categories).join(' ')}`);
         return;
     }
 
     let category:CategoryChannel | null = null;
-    for(let channel of categories[categoryName]){
+    for(const channel of categories[categoryName]){
         if(channel.children.size < 50){
             category = channel;
             break;
         }
     }
     if(category == null){
-        msg.channel.send(`Out of room for ${categoryName}! Ask some one to make more!`);
+        await msg.channel.send(`Out of room for ${categoryName}! Ask some one to make more!`);
         return;
     }
-    let nation = parts.splice(2).join('');
+    const nation = parts.splice(2).join('');
     await msg.guild.channels.create(
         `${msg.member?.displayName}-${nation}`,
         {
@@ -156,16 +155,16 @@ async function mentor(msg: Message & {guild: Guild}){
 
 async function initGuild(msg: Message & {guild:Guild}){
     log.info(`initalizing ${msg.guild.name}`);
-    let roleManager = await msg.guild.roles.fetch();
+    const roleManager = await msg.guild.roles.fetch();
     let changed = false;
     if(!roleManager.cache.find(role => role.name == CONFIG.student_role)){
         await roleManager.create({data: {name: CONFIG.student_role, mentionable: false, permissions: 0}});
         changed = true;
     }
     if(!roleManager.cache.find(role => role.name == CONFIG.mentor_role)){
-        let mentorRole = await roleManager.create({data: {name: CONFIG.mentor_role, mentionable: false, permissions: 0}});
+        const mentorRole = await roleManager.create({data: {name: CONFIG.mentor_role, mentionable: false, permissions: 0}});
         changed = true;
-        msg.guild.me?.roles.add(mentorRole);
+        await msg.guild.me?.roles.add(mentorRole);
     }
     let categoryRole = roleManager.cache.find(role => role.name == CONFIG.mentor_category);
     if(!categoryRole){
@@ -174,7 +173,7 @@ async function initGuild(msg: Message & {guild:Guild}){
     }
     if(changed){
         log.info(`initalized ${msg.guild.name}`);
-        msg.channel.send(`Initalized ${msg.guild.name}`);
+        await msg.channel.send(`Initalized ${msg.guild.name}`);
     }
 }
 
@@ -187,40 +186,40 @@ function hasMessages( obj: any ): obj is {messages: MessageManager}{
 }
 
 async function findStales(msg:Message&{guild:Guild}){
-    let role = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
+    const role = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
     if(!role){
         await msg.channel.send(`Server has no ${CONFIG.mentor_role}[mentor] role!`);
         return;
     }
 
     if(msg.member?.roles.cache.find(r => r.id == role?.id) == null){
-        msg.channel.send(`Only mentors can use this`);
+        await msg.channel.send(`Only mentors can use this`);
         return ;
     }
     let lastTalkThreashold: Date | null = null;
 
     if(msg.content.split(' ').length > 1){
-        let rawTime = msg.content.split(' ').slice(1).join(' ');
-        let ms = getSeconds(rawTime) * 1000;
+        const rawTime = msg.content.split(' ').slice(1).join(' ');
+        const ms = getSeconds(rawTime) * 1000;
         lastTalkThreashold = new Date();
         lastTalkThreashold.setTime(lastTalkThreashold.getTime() - ms);
     }
 
     log.info(`${lastTalkThreashold}`);
 
-    let onlyMentors: string[] = [];
-    let idle: string[] = [];
+    const onlyMentors: string[] = [];
+    const idle: string[] = [];
 
-    let categories = await findCategories(msg.guild);
-    for(let parentCategory in categories){
-        let subcategorys = categories[parentCategory];
-        for(let subcategory of subcategorys){
-            let channels: GuildChannel[] & {messages:MessageManager}[] = [];
+    const categories = await findCategories(msg.guild);
+    for(const parentCategory in categories){
+        const subcategorys = categories[parentCategory];
+        for(const subcategory of subcategorys){
+            const channels: GuildChannel[] & {messages:MessageManager}[] = [];
             subcategory.children.each(channel => {
                 let foundOnlyMentors = true;
                 channel.members.each(member => {
                     if(member.user.id == bot.user?.id) return;
-                    if(member.roles.cache.find(r => r.id == role!.id) == null){
+                    if(member.roles.cache.find(r => r.id == role?.id) == null){
                         foundOnlyMentors = false;
                     }
                 });
@@ -231,10 +230,10 @@ async function findStales(msg:Message&{guild:Guild}){
                 }
             });
             if(lastTalkThreashold){
-                for(let channel of channels){
+                for(const channel of channels){
                     try{
-                        let messages = await channel.messages.fetch({limit: 1});
-                        let m = messages.random();
+                        const messages = await channel.messages.fetch({limit: 1});
+                        const m = messages.random();
                         if(!m || m.createdTimestamp < lastTalkThreashold.getTime()){
                             idle.push(channel.toString());
                         }
@@ -258,19 +257,19 @@ async function findStales(msg:Message&{guild:Guild}){
 
 async function findUser(msg:Message&{guild:Guild}){
     let userID = msg.author.id;
-    let mentionedUser = msg.mentions.users.random();
+    const mentionedUser = msg.mentions.users.random();
     if(mentionedUser && msg.member?.roles.cache.find(role => role.name == CONFIG.mentor_role)){
         userID = mentionedUser.id;
     }
 
-    let categories = await findCategories(msg.guild);
-    let found: string[] = [];
-    for(let parentCategory in categories){
-        let subcategorys = categories[parentCategory];
-        for(let subcategory of subcategorys){
-            let channels: GuildChannel[] & {messages:MessageManager}[] = [];
+    const categories = await findCategories(msg.guild);
+    const found: string[] = [];
+    for(const parentCategory in categories){
+        const subcategorys = categories[parentCategory];
+        for(const subcategory of subcategorys){
+            const channels: GuildChannel[] & {messages:MessageManager}[] = [];
             subcategory.children.filter(channel => channel.permissionOverwrites.find((perm, key) => key == userID) != null).each(c => channels.push(c));
-            for(let c of channels){
+            for(const c of channels){
                 found.push(c.toString());
             }
         }
@@ -279,23 +278,23 @@ async function findUser(msg:Message&{guild:Guild}){
 }
 
 async function rename(msg:Message&{guild:Guild}){
-    let parts = msg.content.split(' ');
+    const parts = msg.content.split(' ');
     if(parts.length < 3){
-        msg.channel.send(`Please format the request in \`!mentor <ERA> <NATION>\``);
+        await msg.channel.send(`Please format the request in \`!mentor <ERA> <NATION>\``);
         return;
     }
 
-    let mentorRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
+    const mentorRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
     if(!mentorRole) {
-        msg.channel.send(`Guild is missing ${CONFIG.mentor_role} role!`);
+        await msg.channel.send(`Guild is missing ${CONFIG.mentor_role} role!`);
         return;
     }
 
-    let channel = msg.channel as GuildChannel;
-    let categories = await findCategories(msg.guild);
+    const channel = msg.channel as GuildChannel;
+    const categories = await findCategories(msg.guild);
     let isInCategory = false;
-    for(let group in categories){
-        for(let category of categories[group]){
+    for(const group in categories){
+        for(const category of categories[group]){
             if(channel.parentID == category.id){
                 isInCategory = true;
             }
@@ -305,29 +304,29 @@ async function rename(msg:Message&{guild:Guild}){
         log.debug(`Requested to rename channel not in category: ${channel.name}`);
         return;
     }
-    let targetChannel = msg.channel as GuildChannel;
+    const targetChannel = msg.channel as GuildChannel;
     if(channel.permissionOverwrites.find((perm, key) => key == msg.author.id) == null){
-        log.debug(`Non owner requested rename of un authorized channel. ${msg.member?.displayName}, ${targetChannel.name}`)
+        log.debug(`Non owner requested rename of un authorized channel. ${msg.member?.displayName}, ${targetChannel.name}`);
         return;
     }
 
-    let categoryName = parts[1].toLowerCase();
+    const categoryName = parts[1].toLowerCase();
     if(!categories[categoryName]){
-        msg.channel.send(`Unrecognized era! Recognized Eras: ${keys(categories).join(' ')}`);
+        await msg.channel.send(`Unrecognized era! Recognized Eras: ${keys(categories).join(' ')}`);
         return;
     }
     let category:CategoryChannel | null = null;
-    for(let channel of categories[categoryName]){
+    for(const channel of categories[categoryName]){
         if(channel.children.size < 50){
             category = channel;
             break;
         }
     }
     if(category == null){
-        msg.channel.send(`Out of room for ${categoryName}! Ask some one to make more!`);
+        await msg.channel.send(`Out of room for ${categoryName}! Ask some one to make more!`);
         return;
     }
-    let nation = parts.splice(2).join('');
+    const nation = parts.splice(2).join('');
 
     await targetChannel.edit({
         parentID: category.id,
@@ -337,24 +336,24 @@ async function rename(msg:Message&{guild:Guild}){
 
 
 async function DRN(msg: Message&{guild:Guild}){
-    let role = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
+    const role = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
     if(!role){
         await msg.channel.send(`Server has no ${CONFIG.mentor_role}[mentor] role!`);
         return;
     }
-    let isMentor = msg.member?.roles.cache.find(r => r.id == role?.id) != null;
-    let targetChannel = msg.channel as GuildChannel;
+    const isMentor = msg.member?.roles.cache.find(r => r.id == role?.id) != null;
+    const targetChannel = msg.channel as GuildChannel;
     if(!isMentor && targetChannel.permissionOverwrites.find((perm, key) => key == msg.author.id) == null){
         log.info(`Insufficient permissions to use DRN here`);
         return;
     }
 
     const DRN_REGEX = /(?<ATK>\d+)\s*vs?\s*(?<DEF>\d+)/;
-    let match = DRN_REGEX.exec(msg.content);
+    const match = DRN_REGEX.exec(msg.content);
 
     function drn(depth: number){
         if(depth > 20) return 10000;
-        let roll = Math.ceil(Math.random() * 6);
+        const roll = Math.ceil(Math.random() * 6);
         if(roll == 6){
             return 5 + drn(depth++);
         }
@@ -362,15 +361,15 @@ async function DRN(msg: Message&{guild:Guild}){
     }
 
     if(match && match?.groups){
-        let atk = Number(match.groups['ATK']);
-        let def = Number(match.groups['DEF']);
-        let result = {wins: 0, losses: 0, values: [] as number[]};
+        const atk = Number(match.groups['ATK']);
+        const def = Number(match.groups['DEF']);
+        const result = {wins: 0, losses: 0, values: [] as number[]};
         let count = 0;
         let sum = 0;
         while(count++ < 1000){
-            let atkDrn = drn(0) + drn(0) + atk;
-            let defDrn = drn(0) + drn(0) + def;
-            let roll = atkDrn - defDrn;
+            const atkDrn = drn(0) + drn(0) + atk;
+            const defDrn = drn(0) + drn(0) + def;
+            const roll = atkDrn - defDrn;
             sum += roll;
             result.values.push(roll);
             if(roll > 0){
@@ -380,11 +379,11 @@ async function DRN(msg: Message&{guild:Guild}){
             }
         }
         result.values = result.values.sort((a, b) => a - b);
-        let rolls = result.wins + result.losses;
+        const rolls = result.wins + result.losses;
         
-        let zero: number[] = [];
-        let breakdown: number[] = [];
-        let granularity = 30;
+        const zero: number[] = [];
+        const breakdown: number[] = [];
+        const granularity = 30;
         for(let i = 0; i < granularity; i++){
             zero[i] = 0;
             let index = Math.floor((i/granularity) * result.values.length);
@@ -393,16 +392,16 @@ async function DRN(msg: Message&{guild:Guild}){
             breakdown[i] = result.values[index];
         }
         
-        let table = new AsciiTable(`${atk} vs ${def}`);
+        const table = new AsciiTable(`${atk} vs ${def}`);
         table.addRow('Rolls', rolls);
         table.addRow('Wins', result.wins);
         table.addRow('Losses', result.losses);
         table.addRow('Avg', (sum/count).toFixed(2));
         table.addRow('Win %', ((result.wins/rolls)*100).toFixed(2));
 
-        let tableStr = table.toString().split('\n') as string[];
-        let graph = AsciiChart.plot([zero, breakdown], {height: tableStr.length}).split('\n') as string[];
-        let output: string[] = [];
+        const tableStr = table.toString().split('\n') as string[];
+        const graph = AsciiChart.plot([zero, breakdown], {height: tableStr.length}).split('\n') as string[];
+        const output: string[] = [];
         output.push('```');
         for(let i = 0; i < tableStr.length; i++){
             output.push(`${tableStr[i]} ${graph[i]}`);
@@ -421,31 +420,31 @@ bot.on('message', async msg => {
         if(!msg.content.startsWith(`${process.env.COMMAND_PREFIX}`)){
             return;
         }
-        let command = msg.content.substr(1);
+        const command = msg.content.substr(1);
         if(hasGuild(msg)){
             const mentorCMD = `${CONFIG.mentor_role}`.toLowerCase();
             log.info(`processing ${command} from ${msg.member?.displayName}`);
             switch(command.split(' ')[0].toLowerCase()){
                 case 'init':
-                    initGuild(msg);
+                    await initGuild(msg);
                     break;
                 case mentorCMD:
-                    mentor(msg);
+                    await mentor(msg);
                     break;
                 case 'rename':
-                    rename(msg);
+                    await rename(msg);
                     break;
                 case 'find':
-                    findUser(msg);
+                    await findUser(msg);
                     break;
                 case 'stales':
-                    findStales(msg);
+                    await findStales(msg);
                     break;
                 case 'drn':
-                    DRN(msg);
+                    await DRN(msg);
                     break;
-                case 'help':
-                    let cmds: string[] = [];
+                case 'help':{
+                    const cmds: string[] = [];
                     cmds.push('Commands');
                     cmds.push('```');
                     cmds.push(`!${mentorCMD} <category> <nation> -- create a ${mentorCMD} channel for yourself`);
@@ -457,7 +456,8 @@ bot.on('message', async msg => {
                         cmds.push(`[${CONFIG.mentor_role} only] !stales <optional time: 1d> -- limit 50 channels`);
                     }
                     cmds.push('```');
-                    msg.channel.send(`${cmds.join('\n')}`);
+                    await msg.channel.send(`${cmds.join('\n')}`);
+                }
             }
         }
     }catch(err){
@@ -465,9 +465,7 @@ bot.on('message', async msg => {
     }
 });
 
-bot.login(TOKEN).then(s => {
-    
-}).catch(err => {
+bot.login(TOKEN).catch(err => {
     log.error(`Failed to log in ${err}`);
     throw err;
 });
