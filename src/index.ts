@@ -6,7 +6,7 @@ require('source-map-support').install();
 import AsciiTable from 'ascii-table';
 import AsciiChart from 'asciichart';
 import dateFormat from 'dateformat';
-import { CategoryChannel, Client, Guild, GuildChannel, Message, MessageManager } from 'discord.js';
+import { CategoryChannel, Client, Guild, GuildChannel, Message, MessageManager, Permissions } from 'discord.js';
 import { keys } from 'lodash';
 import { getLogger, shutdown } from 'log4js';
 
@@ -212,6 +212,18 @@ async function mentor(msg: Message & {guild: Guild}){
 }
 
 async function initGuild(msg: Message & {guild:Guild}){
+    const permResult = 268504272 & (msg.guild.me?.permissions.bitfield || 0);
+    if(permResult != 268504272){
+        const p = new Permissions(268504272);
+        const flags:string[] = [];
+        for(const s in Permissions.FLAGS){
+            if(p.has(Permissions.FLAGS[s]) && !msg.guild.me?.permissions.has(Permissions.FLAGS[s])){
+                flags.push(s);
+            }
+        }
+        await msg.channel.send(`Missing permissions!\n${flags.join('\n')}`);
+        return;
+    }
     log.info(`initalizing ${msg.guild.name}`);
     const roleManager = await msg.guild.roles.fetch();
     let changed = false;
@@ -235,6 +247,8 @@ async function initGuild(msg: Message & {guild:Guild}){
     if(changed){
         log.info(`initalized ${msg.guild.name}`);
         await msg.channel.send(`Initalized ${msg.guild.name}`);
+    }else{
+        await msg.channel.send(`Already initalized`);
     }
 }
 
