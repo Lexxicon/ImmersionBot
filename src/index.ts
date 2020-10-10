@@ -71,6 +71,10 @@ process.on('uncaughtException', function(e) {
     process.exit(99);
 });
 
+process.on('unhandledRejection', (reason: any, p) => {
+    log.error(`Unhandled Rejection at: Promise ${p} reason: ${reason} stack: ${reason?.stack}`);
+});
+
 async function findCategories(guild:Guild){
     let roleManager = await guild.roles.fetch();
     let categoryRole = roleManager.cache.find(role => role.name == CONFIG.mentor_category);
