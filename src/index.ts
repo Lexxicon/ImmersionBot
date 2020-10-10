@@ -492,7 +492,7 @@ bot.on('message', async msg => {
         if(!msg.content.startsWith(`${COMMAND_PREFIX}`)){
             return;
         }
-        const command = msg.content.substr(1);
+        const command = msg.content.substr(COMMAND_PREFIX.length);
         if(hasGuild(msg)){
             const mentorCMD = `${MENTOR_ROLE}`.toLowerCase();
             log.info(`processing ${command} from ${msg.member?.displayName}`);
