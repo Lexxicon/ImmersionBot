@@ -1,3 +1,5 @@
+process.env.LOG4JS_CONFIG = process.env.LOG4JS_CONFIG || "res/log4js.json";
+
 require('dotenv').config();
 require('source-map-support').install();
 
@@ -14,10 +16,10 @@ log.info(``);
 log.info(`-------------- Application Starting ${new Date()} --------------`);
 log.info(``);
 
-const STUDENT_ROLE = require('../res/config.json').student_role as string;
-const MENTOR_ROLE = require('../res/config.json').mentor_role as string;
-const MENTOR_CATEGORY = require('../res/config.json').mentor_category as string;
-
+const STUDENT_ROLE = process.env.STUDENT_ROLE || "Student" as string;
+const MENTOR_ROLE = process.env.MENTOR_ROLE || "Mentor" as string;
+const MENTOR_CATEGORY = process.env.MENTOR_CATEGORY || "Teaching Channel" as string;
+const COMMAND_PREFIX = process.env.COMMAND_PREFIX || "!" as string;
 
 require('./ValidateEnv.js').validate();
 
@@ -227,7 +229,7 @@ async function initGuild(msg: Message & {guild:Guild}){
     let categoryRole = roleManager.cache.find(role => role.name == MENTOR_CATEGORY);
     if(!categoryRole){
         categoryRole = await roleManager.create({data: {name: MENTOR_CATEGORY, mentionable: false, permissions: 0}});
-        await msg.channel.send(`Created ${categoryRole.toString()} as mentory channel role`);
+        await msg.channel.send(`Created ${categoryRole.toString()} as mentor channel role`);
         changed = true;
     }
     if(changed){
@@ -473,7 +475,7 @@ bot.on('ready', () => {
 
 bot.on('message', async msg => {
     try{
-        if(!msg.content.startsWith(`${process.env.COMMAND_PREFIX}`)){
+        if(!msg.content.startsWith(`${COMMAND_PREFIX}`)){
             return;
         }
         const command = msg.content.substr(1);
