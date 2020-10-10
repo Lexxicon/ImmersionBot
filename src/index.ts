@@ -108,29 +108,42 @@ async function mentor(msg: Message & {guild: Guild}){
     }
     const parts = msg.content.split(' ');
     if(parts.length < 3){
-        await msg.channel.send(`Please format the request in \`!mentor <ERA> <NATION>\``);
+        await msg.channel.send(`Please format the request in \`!mentor <CATEGORY> <NATION>\``);
         return;
     }
     const categoryName = parts[1].toLowerCase();
     const categories = await findCategories(msg.guild);
     if(!categories[categoryName]){
-        await msg.channel.send(`Unrecognized era! Recognized Eras: ${keys(categories).join(' ')}`);
+        await msg.channel.send(`Unrecognized Category! Recognized Categories: ${keys(categories).join(' ')}`);
         return;
     }
 
     let category:CategoryChannel | null = null;
+    let lastFoundCategory:CategoryChannel | null = null;
     for(const channel of categories[categoryName]){
-        if(channel.children.size < 50){
+        if(channel.children.size < 5){
             category = channel;
             break;
+        }else{
+            lastFoundCategory = channel;
         }
     }
     if(category == null){
-        await msg.channel.send(`Out of room for ${categoryName}! Ask some one to make more!`);
-        return;
+        let counter = 1;
+        while(msg.guild.channels.cache.find(channel => channel.name.toLowerCase() == `${categoryName} ${counter}`) != null){
+            counter++;
+            if(counter > 10){
+                await msg.channel.send(`Out of room for ${categoryName}! Ask someone to make more!`);
+                return;
+            }
+        }
+        category = await msg.guild.channels.create(`${categoryName} ${counter}`, {
+            type: 'category',
+            position: lastFoundCategory?.position
+        });
     }
     const nation = parts.splice(2).join('');
-    await msg.guild.channels.create(
+    const mentorChannel = await msg.guild.channels.create(
         `${msg.member?.displayName}-${nation}`,
         {
             type:'text',
@@ -151,6 +164,7 @@ async function mentor(msg: Message & {guild: Guild}){
             ]
         });
     await msg.member?.roles.add(studentRole);
+    await msg.channel.send(`Created ${mentorChannel.toString()}`);
 }
 
 async function initGuild(msg: Message & {guild:Guild}){
