@@ -14,7 +14,10 @@ log.info(``);
 log.info(`-------------- Application Starting ${new Date()} --------------`);
 log.info(``);
 
-const CONFIG = require('../res/config.json');
+const STUDENT_ROLE = require('../res/config.json').student_role as string;
+const MENTOR_ROLE = require('../res/config.json').mentor_role as string;
+const MENTOR_CATEGORY = require('../res/config.json').mentor_category as string;
+
 
 require('./ValidateEnv.js').validate();
 
@@ -76,7 +79,7 @@ process.on('unhandledRejection', (reason: any, p) => {
 
 async function findCategories(guild:Guild){
     const roleManager = await guild.roles.fetch();
-    const categoryRole = roleManager.cache.find(role => role.name == CONFIG.mentor_category);
+    const categoryRole = roleManager.cache.find(role => role.name == MENTOR_CATEGORY);
     const categories: { [index: string]: CategoryChannel[] } = {};
     guild.channels.cache.forEach(channel => {   
         if(channel.type == "category" && categoryRole?.id && channel.permissionOverwrites.find(overwrite => overwrite.id == categoryRole?.id)){
@@ -90,22 +93,70 @@ async function findCategories(guild:Guild){
     return categories;
 }
 
+async function extendCategory(categoryName: string, msg: Message & {guild: Guild}){
+    log.info(`Extending ${categoryName}`);
+    const channelRole = await findRole(msg, MENTOR_CATEGORY);
+    if(!channelRole){
+        return null;
+    }
+    let counter = 1;
+    let position = -1;
+    let lastFoundCategory = msg.guild.channels.cache.find(channel => channel.name.toLowerCase() == `${categoryName} ${counter}`);
+    if(lastFoundCategory){
+        position = lastFoundCategory.position;
+        while((lastFoundCategory = msg.guild.channels.cache.find(channel => channel.name.toLowerCase() == `${categoryName} ${counter}`)) != null){
+            position = lastFoundCategory.position;
+            counter++;
+            if(counter > 10){
+                return null;
+            }
+        }
+        return await msg.guild.channels.create(`${categoryName} ${counter}`, {
+            type: 'category',
+            position: position,
+            permissionOverwrites: [{
+                    id: channelRole.id
+                }
+            ]
+        });
+    }
+    return null;
+}
+
+// async function extendNewCategory
+
+async function findRole(msg: Message & {guild: Guild}, roleName: string){
+    const mentorRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == roleName);
+    if(!mentorRole){
+        await msg.channel.send(`Server has no ${roleName} role!`);
+        return;
+    }
+    return mentorRole;
+}
+
+function hasGuild( obj: any ): obj is {guild:Guild} {
+    return 'guild' in obj;
+}
+
+function hasMessages( obj: any ): obj is {messages: MessageManager}{
+    return 'messages' in obj;
+}
+
 async function mentor(msg: Message & {guild: Guild}){
-    if(msg.member?.roles.cache.find(role => role.name == CONFIG.student_role)){
-        await msg.channel.send(`You are already a ${CONFIG.student_role}!`);
+    if(msg.member?.roles.cache.find(role => role.name == STUDENT_ROLE)){
+        await msg.channel.send(`You are already a ${STUDENT_ROLE}!`);
         await findUser(msg);
         return;
     }
-    const mentorRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
+    const mentorRole = await findRole(msg, MENTOR_ROLE);
     if(!mentorRole){
-        await msg.channel.send(`Server has no ${CONFIG.mentor_role}[mentor] role!`);
         return;
     }
-    const studentRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.student_role);
+    const studentRole = await findRole(msg, STUDENT_ROLE);
     if(!studentRole){
-        await msg.channel.send(`Server has no ${CONFIG.student_role}[student] role!`);
         return;
     }
+
     const parts = msg.content.split(' ');
     if(parts.length < 3){
         await msg.channel.send(`Please format the request in \`!mentor <CATEGORY> <NATION>\``);
@@ -119,35 +170,26 @@ async function mentor(msg: Message & {guild: Guild}){
     }
 
     let category:CategoryChannel | null = null;
-    let lastFoundCategory:CategoryChannel | null = null;
     for(const channel of categories[categoryName]){
         if(channel.children.size < 5){
             category = channel;
             break;
-        }else{
-            lastFoundCategory = channel;
         }
     }
     if(category == null){
-        let counter = 1;
-        while(msg.guild.channels.cache.find(channel => channel.name.toLowerCase() == `${categoryName} ${counter}`) != null){
-            counter++;
-            if(counter > 10){
-                await msg.channel.send(`Out of room for ${categoryName}! Ask someone to make more!`);
-                return;
-            }
+        category = await extendCategory(categoryName, msg);
+        if(categoryName == null){
+            await msg.channel.send(`Out of room for ${categoryName}! Ask someone to make more!`);
+            return;
         }
-        category = await msg.guild.channels.create(`${categoryName} ${counter}`, {
-            type: 'category',
-            position: lastFoundCategory?.position
-        });
     }
+
     const nation = parts.splice(2).join('');
     const mentorChannel = await msg.guild.channels.create(
         `${msg.member?.displayName}-${nation}`,
         {
             type:'text',
-            parent: category,
+            parent: category?.id,
             permissionOverwrites:[
                 {
                     id: msg.guild.id,
@@ -171,18 +213,21 @@ async function initGuild(msg: Message & {guild:Guild}){
     log.info(`initalizing ${msg.guild.name}`);
     const roleManager = await msg.guild.roles.fetch();
     let changed = false;
-    if(!roleManager.cache.find(role => role.name == CONFIG.student_role)){
-        await roleManager.create({data: {name: CONFIG.student_role, mentionable: false, permissions: 0}});
+    if(!roleManager.cache.find(role => role.name == STUDENT_ROLE)){
+        const role = await roleManager.create({data: {name: STUDENT_ROLE, mentionable: false, permissions: 0}});
+        await msg.channel.send(`Created ${role.toString()} as student role`);
         changed = true;
     }
-    if(!roleManager.cache.find(role => role.name == CONFIG.mentor_role)){
-        const mentorRole = await roleManager.create({data: {name: CONFIG.mentor_role, mentionable: false, permissions: 0}});
+    if(!roleManager.cache.find(role => role.name == MENTOR_ROLE)){
+        const mentorRole = await roleManager.create({data: {name: MENTOR_ROLE, mentionable: false, permissions: 0}});
+        await msg.channel.send(`Created ${mentorRole.toString()} as mentor role`);
         changed = true;
         await msg.guild.me?.roles.add(mentorRole);
     }
-    let categoryRole = roleManager.cache.find(role => role.name == CONFIG.mentor_category);
+    let categoryRole = roleManager.cache.find(role => role.name == MENTOR_CATEGORY);
     if(!categoryRole){
-        categoryRole = await roleManager.create({data: {name: CONFIG.mentor_category, mentionable: false, permissions: 0}});
+        categoryRole = await roleManager.create({data: {name: MENTOR_CATEGORY, mentionable: false, permissions: 0}});
+        await msg.channel.send(`Created ${categoryRole.toString()} as mentory channel role`);
         changed = true;
     }
     if(changed){
@@ -191,18 +236,9 @@ async function initGuild(msg: Message & {guild:Guild}){
     }
 }
 
-function hasGuild( obj: any ): obj is {guild:Guild} {
-    return 'guild' in obj;
-}
-
-function hasMessages( obj: any ): obj is {messages: MessageManager}{
-    return 'messages' in obj;
-}
-
 async function findStales(msg:Message&{guild:Guild}){
-    const role = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
+    const role = await findRole(msg, MENTOR_ROLE);
     if(!role){
-        await msg.channel.send(`Server has no ${CONFIG.mentor_role}[mentor] role!`);
         return;
     }
 
@@ -210,6 +246,7 @@ async function findStales(msg:Message&{guild:Guild}){
         await msg.channel.send(`Only mentors can use this`);
         return ;
     }
+    
     let lastTalkThreashold: Date | null = null;
 
     if(msg.content.split(' ').length > 1){
@@ -272,7 +309,7 @@ async function findStales(msg:Message&{guild:Guild}){
 async function findUser(msg:Message&{guild:Guild}){
     let userID = msg.author.id;
     const mentionedUser = msg.mentions.users.random();
-    if(mentionedUser && msg.member?.roles.cache.find(role => role.name == CONFIG.mentor_role)){
+    if(mentionedUser && msg.member?.roles.cache.find(role => role.name == MENTOR_ROLE)){
         userID = mentionedUser.id;
     }
 
@@ -298,9 +335,8 @@ async function rename(msg:Message&{guild:Guild}){
         return;
     }
 
-    const mentorRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
+    const mentorRole = await findRole(msg, MENTOR_ROLE);
     if(!mentorRole) {
-        await msg.channel.send(`Guild is missing ${CONFIG.mentor_role} role!`);
         return;
     }
 
@@ -337,6 +373,9 @@ async function rename(msg:Message&{guild:Guild}){
         }
     }
     if(category == null){
+        category = await extendCategory(categoryName, msg);
+    }
+    if(category == null){
         await msg.channel.send(`Out of room for ${categoryName}! Ask some one to make more!`);
         return;
     }
@@ -346,16 +385,17 @@ async function rename(msg:Message&{guild:Guild}){
         parentID: category.id,
         name: `${msg.member?.displayName}-${nation}`
     });
+
+    await msg.channel.send(`Renamed to ${targetChannel.toString()}`);
 }
 
 
 async function DRN(msg: Message&{guild:Guild}){
-    const role = (await msg.guild.roles.fetch()).cache.find(role => role.name == CONFIG.mentor_role);
+    const role = await findRole(msg, MENTOR_ROLE);
     if(!role){
-        await msg.channel.send(`Server has no ${CONFIG.mentor_role}[mentor] role!`);
         return;
     }
-    const isMentor = msg.member?.roles.cache.find(r => r.id == role?.id) != null;
+    const isMentor = msg.member?.roles.cache.find(r => r.id == role.id) != null;
     const targetChannel = msg.channel as GuildChannel;
     if(!isMentor && targetChannel.permissionOverwrites.find((perm, key) => key == msg.author.id) == null){
         log.info(`Insufficient permissions to use DRN here`);
@@ -422,6 +462,8 @@ async function DRN(msg: Message&{guild:Guild}){
         }
         output.push('```');
         await msg.channel.send(`${output.join('\n')}`);
+    }else{
+       await  msg.channel.send(`Unrecognized input`);
     }
 }
 
@@ -436,7 +478,7 @@ bot.on('message', async msg => {
         }
         const command = msg.content.substr(1);
         if(hasGuild(msg)){
-            const mentorCMD = `${CONFIG.mentor_role}`.toLowerCase();
+            const mentorCMD = `${MENTOR_ROLE}`.toLowerCase();
             log.info(`processing ${command} from ${msg.member?.displayName}`);
             switch(command.split(' ')[0].toLowerCase()){
                 case 'init':
@@ -465,9 +507,9 @@ bot.on('message', async msg => {
                     cmds.push(`!rename <category> <nation> -- rename your ${mentorCMD} channel (must be done within your ${mentorCMD} channel)`);
                     cmds.push(`!drn <number> vs <number> -- generate stats for an opposed 2drn vs 2drn check (only works in your ${mentorCMD} channel)`);
                     cmds.push('!find -- find your channel');
-                    if(msg.member?.roles.cache.find(r => r.name == CONFIG.mentor_role) != null){
-                        cmds.push(`[${CONFIG.mentor_role} only] !fine <@user> -- find ${mentorCMD} channel(s) for a user`);
-                        cmds.push(`[${CONFIG.mentor_role} only] !stales <optional time: 1d> -- limit 50 channels`);
+                    if(msg.member?.roles.cache.find(r => r.name == MENTOR_ROLE) != null){
+                        cmds.push(`[${MENTOR_ROLE} only] !fine <@user> -- find ${mentorCMD} channel(s) for a user`);
+                        cmds.push(`[${MENTOR_ROLE} only] !stales <optional time: 1d> -- limit 50 channels`);
                     }
                     cmds.push('```');
                     await msg.channel.send(`${cmds.join('\n')}`);
