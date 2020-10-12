@@ -248,7 +248,9 @@ async function initGuild(msg: Message & {guild:Guild}){
         log.info(`initalized ${msg.guild.name}`);
         await msg.channel.send(`Initalized ${msg.guild.name}`);
     }else{
-        await msg.channel.send(`Already initalized`);
+        if(msg.member?.roles.cache.find(role => role.name == MENTOR_ROLE) != null){
+            await msg.channel.send(`Already initalized`);
+        }
     }
 }
 
@@ -259,7 +261,6 @@ async function findStales(msg:Message&{guild:Guild}){
     }
 
     if(msg.member?.roles.cache.find(r => r.id == role?.id) == null){
-        await msg.channel.send(`Only mentors can use this`);
         return ;
     }
     
@@ -337,7 +338,9 @@ async function findUser(msg:Message&{guild:Guild}){
             const channels: GuildChannel[] & {messages:MessageManager}[] = [];
             subcategory.children.filter(channel => channel.permissionOverwrites.find((perm, key) => key == userID) != null).each(c => channels.push(c));
             for(const c of channels){
-                found.push(c.toString());
+                if(found.length < 50){
+                    found.push(c.toString());
+                }
             }
         }
     }
@@ -347,7 +350,7 @@ async function findUser(msg:Message&{guild:Guild}){
 async function rename(msg:Message&{guild:Guild}){
     const parts = msg.content.split(' ');
     if(parts.length < 3){
-        await msg.channel.send(`Please format the request in \`!mentor <ERA> <NATION>\``);
+        await msg.channel.send(`Please format the request in \`!mentor <NEW_ERA> <NEW_NATION>\``);
         return;
     }
 
@@ -404,7 +407,6 @@ async function rename(msg:Message&{guild:Guild}){
 
     await msg.channel.send(`Renamed to ${targetChannel.toString()}`);
 }
-
 
 async function DRN(msg: Message&{guild:Guild}){
     const role = await findRole(msg, MENTOR_ROLE);
