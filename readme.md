@@ -83,8 +83,10 @@ By default, commands must be prefixed with `!`, but this can be configured by se
     - The name of this command can be the name may be overriden with the `MENTOR_CATEGORY` environment variable
 <br>
 <br>
+
 ### Setup
 #
+
 1. Install nodeJS 12.0+
 2. Clone repo
 3. run `npm install`
