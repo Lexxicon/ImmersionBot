@@ -21,12 +21,17 @@ By default, commands must be prefixed with `!`, but this can be configured by se
 ### Commands
 #
 - help
-    - Basically lists this, but only shows command variants the user has access to
     - Where
         - Anywhere
     - Who
         - Anyone
+    - Basically lists this, but only shows command variants the user has access to
 - init
+    - Where
+        - Anywhere
+    - Who
+        - Anyone
+            - Does nothing if a server is already initalized
     - Checks that the bot has the needed permissions and reports any missing permissions
     - Creates the needed Roles if they don't exist and reports created roles
 - rename
