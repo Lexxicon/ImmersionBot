@@ -16,8 +16,10 @@
     - Name is overriden by the `MENTOR_CATEGORY` environment variable
 
 By default, commands must be prefixed with `!`, but this can be configured by setting the `COMMAND_PREFIX` environment variable
-#
+<br>
+<br>
 ### Commands
+#
 - help
     - Basically lists this, but only shows command variants the user has access to
     - Where
@@ -79,9 +81,10 @@ By default, commands must be prefixed with `!`, but this can be configured by se
         - A 'win' is the attacker's result exceeding the defenders result
 - mentor
     - The name of this command can be the name may be overriden with the `MENTOR_CATEGORY` environment variable
-#
+<br>
+<br>
 ### Setup
-
+#
 1. Install nodeJS 12.0+
 2. Clone repo
 3. run `npm install`
