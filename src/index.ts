@@ -561,13 +561,13 @@ bot.on('message', async msg => {
                     const cmds: string[] = [];
                     cmds.push('Commands');
                     cmds.push('```');
-                    cmds.push(`!${mentorCMD} <category> <nation> -- create a ${mentorCMD} channel for yourself`);
-                    cmds.push(`!rename <category> <nation> -- rename your ${mentorCMD} channel (must be done within your ${mentorCMD} channel)`);
-                    cmds.push(`!drn <number> vs <number> -- generate stats for an opposed 2drn vs 2drn check (only works in your ${mentorCMD} channel)`);
-                    cmds.push('!find -- find your channel');
+                    cmds.push(`${mentorCMD} <category> <nation> -- create a ${mentorCMD} channel for yourself`);
+                    cmds.push(`${COMMAND_PREFIX}rename <category> <nation> -- rename your ${mentorCMD} channel (must be done within your ${mentorCMD} channel)`);
+                    cmds.push(`${COMMAND_PREFIX}drn <number> vs <number> -- generate stats for an opposed 2drn vs 2drn check (only works in your ${mentorCMD} channel)`);
+                    cmds.push(`${COMMAND_PREFIX}find -- find your channel`);
                     if(msg.member?.roles.cache.find(r => r.name == MENTOR_ROLE) != null){
-                        cmds.push(`[${MENTOR_ROLE} only] !fine <@user> -- find ${mentorCMD} channel(s) for a user`);
-                        cmds.push(`[${MENTOR_ROLE} only] !stales <optional time: 1d> -- limit 50 channels`);
+                        cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}find <@user> -- find ${mentorCMD} channel(s) for a user`);
+                        cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}stales <optional time: 1d> -- limit 50 channels`);
                     }
                     cmds.push('```');
                     await msg.channel.send(`${cmds.join('\n')}`);
