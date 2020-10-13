@@ -6,7 +6,7 @@ require('source-map-support').install();
 import AsciiTable from 'ascii-table';
 import AsciiChart from 'asciichart';
 import dateFormat from 'dateformat';
-import { CategoryChannel, Client, Guild, GuildChannel, Message, MessageManager, Permissions } from 'discord.js';
+import { CategoryChannel, Client, Guild, GuildChannel, GuildMember, Message, MessageManager, Permissions } from 'discord.js';
 import { keys } from 'lodash';
 import { getLogger, shutdown } from 'log4js';
 
@@ -485,6 +485,43 @@ async function DRN(msg: Message&{guild:Guild}){
     }
 }
 
+async function bulkApplyStudentTag(msg: Message & {guild:Guild}){
+    const mentorRole = await findRole(msg, MENTOR_ROLE);
+    const studentRole = await findRole(msg, STUDENT_ROLE);
+    if(!mentorRole || !studentRole){
+        return;
+    }
+    let changes = 0;
+    const categories = await findCategories(msg.guild);
+    const userMap = {};
+    log.debug(`Found categories ${JSON.stringify(categories)}`);
+    for(const parentCategory in categories){
+        log.debug(`Checking parent category ${parentCategory}`);
+        const subcategorys = categories[parentCategory];
+        for(const subcategory of subcategorys){
+            log.debug(`Checking sub category ${subcategory.name}`);
+            const students: GuildMember[]= [];
+            subcategory.children.each(channel => {
+                log.debug(`Checking channel ${channel.name}`);
+                channel.members.each(member => {
+                    if(member.user.id == bot.user?.id) return;
+                    if(member.roles.cache.find(r => r.id == mentorRole?.id) == null){
+                        students.push(member);
+                    }
+                });
+            });
+            for(const student of students){
+                if(!userMap[student.id]){
+                    await student.roles.add(studentRole);
+                    changes++;
+                    userMap[student.id] = true;
+                }
+            }
+        }
+    }
+    await msg.channel.send(`Added ${studentRole.toString()} to ${changes} users`);
+}
+
 bot.on('ready', () => {
     log.info(`Logged in as ${bot?.user?.tag}!`);
 });
@@ -517,6 +554,9 @@ bot.on('message', async msg => {
                 case 'drn':
                     await DRN(msg);
                     break;
+                case 'bulkapplystudenttag':
+                    await bulkApplyStudentTag(msg);
+                    break;
                 case 'help':{
                     const cmds: string[] = [];
                     cmds.push('Commands');
@@ -533,6 +573,7 @@ bot.on('message', async msg => {
                     await msg.channel.send(`${cmds.join('\n')}`);
                 }
             }
+            log.debug(`finished processing ${command} from ${msg.member?.displayName}`);
         }
     }catch(err){
         log.error(err);
