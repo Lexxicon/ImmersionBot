@@ -619,8 +619,8 @@ bot.on('message', async msg => {
                         cmds.push(`${COMMAND_PREFIX}drn <number> vs <number> -- generate stats for an opposed 2drn vs 2drn check (only works in your ${mentorCMD} channel)`);
                         cmds.push(`${COMMAND_PREFIX}find -- find your channel`);
                         if (msg.member?.roles.cache.find(r => r.name == MENTOR_ROLE) != null) {
-                            cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}findstudents -- find ${mentorCMD} channel(s) where a mentor hasn't talked in the last five messages`);
-                            cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}fine <@user> -- find ${mentorCMD} channel(s) for a user`);
+                            cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}findStudents -- find ${mentorCMD} channel(s) where a mentor hasn't talked in the last five messages`);
+                            cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}find <@user> -- find ${mentorCMD} channel(s) for a user`);
                             cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}stales <optional time: 1d> -- limit 50 channels`);
                         }
                         cmds.push('```');
