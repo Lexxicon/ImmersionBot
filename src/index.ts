@@ -167,13 +167,13 @@ async function mentor(msg: Message & { guild: Guild }) {
     const categoryName = parts[1].toLowerCase();
     const categories = await findCategories(msg.guild);
     if (!categories[categoryName]) {
-        await msg.channel.send(`Unrecognized Category! Recognized Categories: ${keys(categories).join(' ')}`);
+        await msg.channel.send(`Unrecognized Category! Recognized Categories: "${keys(categories).join('", "')}"`);
         return;
     }
 
     let category: CategoryChannel | null = null;
     for (const channel of categories[categoryName]) {
-        if (channel.children.size < 5) {
+        if (channel.children.size < 50) {
             category = channel;
             break;
         }
