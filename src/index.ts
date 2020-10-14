@@ -6,7 +6,7 @@ require('source-map-support').install();
 import AsciiTable from 'ascii-table';
 import AsciiChart from 'asciichart';
 import dateFormat from 'dateformat';
-import { CategoryChannel, Client, Guild, GuildChannel, GuildMember, Message, MessageManager, Permissions } from 'discord.js';
+import { CategoryChannel, Client, Guild, GuildChannel, GuildMember, Message, MessageManager, MessageReaction, Permissions } from 'discord.js';
 import { keys } from 'lodash';
 import { getLogger, shutdown } from 'log4js';
 
@@ -27,11 +27,11 @@ require('./ValidateEnv.js').validate();
 const bot = new Client();
 const TOKEN = process.env.TOKEN;
 
-export function getDiscordBot(){
+export function getDiscordBot() {
     return bot;
 }
 
-function cleanup(){
+function cleanup() {
     log.info('Goodbye');
     shutdown();
 }
@@ -42,15 +42,15 @@ const SEC_IN_HOUR = SEC_IN_MIN * 60;
 const SEC_IN_DAY = SEC_IN_HOUR * 24;
 
 function getSeconds(str: string) {
-    if(str.startsWith('-')) throw `Negative times aren't allowed! ${str}`;
+    if (str.startsWith('-')) throw `Negative times aren't allowed! ${str}`;
     let seconds = 0;
     const days = str.match(/(\d+)\s*d/);
     const hours = str.match(/(\d+)\s*h/);
     const minutes = str.match(/(\d+)\s*m/);
     const rawSeconds = str.match(/(\d+)\s*s/);
-    if (days) { seconds += parseInt(days[1])*SEC_IN_DAY; }
-    if (hours) { seconds += parseInt(hours[1])*SEC_IN_HOUR; }
-    if (minutes) { seconds += parseInt(minutes[1])*SEC_IN_MIN; }
+    if (days) { seconds += parseInt(days[1]) * SEC_IN_DAY; }
+    if (hours) { seconds += parseInt(hours[1]) * SEC_IN_HOUR; }
+    if (minutes) { seconds += parseInt(minutes[1]) * SEC_IN_MIN; }
     if (rawSeconds) { seconds += parseInt(rawSeconds[1]); }
     return seconds;
 }
@@ -68,7 +68,7 @@ process.on('SIGINT', function () {
 });
 
 //catch uncaught exceptions, trace, then exit normally
-process.on('uncaughtException', function(e) {
+process.on('uncaughtException', function (e) {
     log.error(`Uncaught Exception... ${e} ${e.name}`);
     log.error(e.stack);
     cleanup();
@@ -79,14 +79,14 @@ process.on('unhandledRejection', (reason: any, p) => {
     log.error(`Unhandled Rejection at: Promise ${p} reason: ${reason} stack: ${reason?.stack}`);
 });
 
-async function findCategories(guild:Guild){
+async function findCategories(guild: Guild) {
     const roleManager = await guild.roles.fetch();
     const categoryRole = roleManager.cache.find(role => role.name == MENTOR_CATEGORY);
     const categories: { [index: string]: CategoryChannel[] } = {};
-    guild.channels.cache.forEach(channel => {   
-        if(channel.type == "category" && categoryRole?.id && channel.permissionOverwrites.find(overwrite => overwrite.id == categoryRole?.id)){
+    guild.channels.cache.forEach(channel => {
+        if (channel.type == "category" && categoryRole?.id && channel.permissionOverwrites.find(overwrite => overwrite.id == categoryRole?.id)) {
             const category = channel.name.split(' ')[0].toLowerCase();
-            if(!categories[category]){ 
+            if (!categories[category]) {
                 categories[category] = [];
             }
             categories[category].push(channel as CategoryChannel);
@@ -95,21 +95,21 @@ async function findCategories(guild:Guild){
     return categories;
 }
 
-async function extendCategory(categoryName: string, msg: Message & {guild: Guild}){
+async function extendCategory(categoryName: string, msg: Message & { guild: Guild }) {
     log.info(`Extending ${categoryName}`);
     const channelRole = await findRole(msg, MENTOR_CATEGORY);
-    if(!channelRole){
+    if (!channelRole) {
         return null;
     }
     let counter = 1;
     let position = -1;
     let lastFoundCategory = msg.guild.channels.cache.find(channel => channel.name.toLowerCase() == `${categoryName} ${counter}`);
-    if(lastFoundCategory){
+    if (lastFoundCategory) {
         position = lastFoundCategory.position;
-        while((lastFoundCategory = msg.guild.channels.cache.find(channel => channel.name.toLowerCase() == `${categoryName} ${counter}`)) != null){
+        while ((lastFoundCategory = msg.guild.channels.cache.find(channel => channel.name.toLowerCase() == `${categoryName} ${counter}`)) != null) {
             position = lastFoundCategory.position;
             counter++;
-            if(counter > 10){
+            if (counter > 10) {
                 return null;
             }
         }
@@ -117,8 +117,8 @@ async function extendCategory(categoryName: string, msg: Message & {guild: Guild
             type: 'category',
             position: position,
             permissionOverwrites: [{
-                    id: channelRole.id
-                }
+                id: channelRole.id
+            }
             ]
         });
     }
@@ -127,60 +127,60 @@ async function extendCategory(categoryName: string, msg: Message & {guild: Guild
 
 // async function extendNewCategory
 
-async function findRole(msg: Message & {guild: Guild}, roleName: string){
+async function findRole(msg: Message & { guild: Guild }, roleName: string) {
     const mentorRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == roleName);
-    if(!mentorRole){
+    if (!mentorRole) {
         await msg.channel.send(`Server has no ${roleName} role!`);
         return;
     }
     return mentorRole;
 }
 
-function hasGuild( obj: any ): obj is {guild:Guild} {
+function hasGuild(obj: any): obj is { guild: Guild } {
     return 'guild' in obj;
 }
 
-function hasMessages( obj: any ): obj is {messages: MessageManager}{
+function hasMessages(obj: any): obj is { messages: MessageManager } {
     return 'messages' in obj;
 }
 
-async function mentor(msg: Message & {guild: Guild}){
-    if(msg.member?.roles.cache.find(role => role.name == STUDENT_ROLE)){
+async function mentor(msg: Message & { guild: Guild }) {
+    if (msg.member?.roles.cache.find(role => role.name == STUDENT_ROLE)) {
         await msg.channel.send(`You are already a ${STUDENT_ROLE}!`);
         await findUser(msg);
         return;
     }
     const mentorRole = await findRole(msg, MENTOR_ROLE);
-    if(!mentorRole){
+    if (!mentorRole) {
         return;
     }
     const studentRole = await findRole(msg, STUDENT_ROLE);
-    if(!studentRole){
+    if (!studentRole) {
         return;
     }
 
     const parts = msg.content.split(' ');
-    if(parts.length < 3){
+    if (parts.length < 3) {
         await msg.channel.send(`Please format the request in \`!mentor <CATEGORY> <NATION>\``);
         return;
     }
     const categoryName = parts[1].toLowerCase();
     const categories = await findCategories(msg.guild);
-    if(!categories[categoryName]){
+    if (!categories[categoryName]) {
         await msg.channel.send(`Unrecognized Category! Recognized Categories: ${keys(categories).join(' ')}`);
         return;
     }
 
-    let category:CategoryChannel | null = null;
-    for(const channel of categories[categoryName]){
-        if(channel.children.size < 5){
+    let category: CategoryChannel | null = null;
+    for (const channel of categories[categoryName]) {
+        if (channel.children.size < 5) {
             category = channel;
             break;
         }
     }
-    if(category == null){
+    if (category == null) {
         category = await extendCategory(categoryName, msg);
-        if(categoryName == null){
+        if (categoryName == null) {
             await msg.channel.send(`Out of room for ${categoryName}! Ask someone to make more!`);
             return;
         }
@@ -190,9 +190,9 @@ async function mentor(msg: Message & {guild: Guild}){
     const mentorChannel = await msg.guild.channels.create(
         `${msg.member?.displayName}-${nation}`,
         {
-            type:'text',
+            type: 'text',
             parent: category?.id,
-            permissionOverwrites:[
+            permissionOverwrites: [
                 {
                     id: msg.guild.id,
                     deny: ['VIEW_CHANNEL'],
@@ -211,13 +211,13 @@ async function mentor(msg: Message & {guild: Guild}){
     await msg.channel.send(`Created ${mentorChannel.toString()}`);
 }
 
-async function initGuild(msg: Message & {guild:Guild}){
+async function initGuild(msg: Message & { guild: Guild }) {
     const permResult = 268504272 & (msg.guild.me?.permissions.bitfield || 0);
-    if(permResult != 268504272){
+    if (permResult != 268504272) {
         const p = new Permissions(268504272);
-        const flags:string[] = [];
-        for(const s in Permissions.FLAGS){
-            if(p.has(Permissions.FLAGS[s]) && !msg.guild.me?.permissions.has(Permissions.FLAGS[s])){
+        const flags: string[] = [];
+        for (const s in Permissions.FLAGS) {
+            if (p.has(Permissions.FLAGS[s]) && !msg.guild.me?.permissions.has(Permissions.FLAGS[s])) {
                 flags.push(s);
             }
         }
@@ -227,46 +227,46 @@ async function initGuild(msg: Message & {guild:Guild}){
     log.info(`initalizing ${msg.guild.name}`);
     const roleManager = await msg.guild.roles.fetch();
     let changed = false;
-    if(!roleManager.cache.find(role => role.name == STUDENT_ROLE)){
-        const role = await roleManager.create({data: {name: STUDENT_ROLE, mentionable: false, permissions: 0}});
+    if (!roleManager.cache.find(role => role.name == STUDENT_ROLE)) {
+        const role = await roleManager.create({ data: { name: STUDENT_ROLE, mentionable: false, permissions: 0 } });
         await msg.channel.send(`Created ${role.toString()} as student role`);
         changed = true;
     }
-    if(!roleManager.cache.find(role => role.name == MENTOR_ROLE)){
-        const mentorRole = await roleManager.create({data: {name: MENTOR_ROLE, mentionable: false, permissions: 0}});
+    if (!roleManager.cache.find(role => role.name == MENTOR_ROLE)) {
+        const mentorRole = await roleManager.create({ data: { name: MENTOR_ROLE, mentionable: false, permissions: 0 } });
         await msg.channel.send(`Created ${mentorRole.toString()} as mentor role`);
         changed = true;
         await msg.guild.me?.roles.add(mentorRole);
     }
     let categoryRole = roleManager.cache.find(role => role.name == MENTOR_CATEGORY);
-    if(!categoryRole){
-        categoryRole = await roleManager.create({data: {name: MENTOR_CATEGORY, mentionable: false, permissions: 0}});
+    if (!categoryRole) {
+        categoryRole = await roleManager.create({ data: { name: MENTOR_CATEGORY, mentionable: false, permissions: 0 } });
         await msg.channel.send(`Created ${categoryRole.toString()} as mentor channel role`);
         changed = true;
     }
-    if(changed){
+    if (changed) {
         log.info(`initalized ${msg.guild.name}`);
         await msg.channel.send(`Initalized ${msg.guild.name}`);
-    }else{
-        if(msg.member?.roles.cache.find(role => role.name == MENTOR_ROLE) != null){
+    } else {
+        if (msg.member?.roles.cache.find(role => role.name == MENTOR_ROLE) != null) {
             await msg.channel.send(`Already initalized`);
         }
     }
 }
 
-async function findStales(msg:Message&{guild:Guild}){
+async function findStales(msg: Message & { guild: Guild }) {
     const role = await findRole(msg, MENTOR_ROLE);
-    if(!role){
+    if (!role) {
         return;
     }
 
-    if(msg.member?.roles.cache.find(r => r.id == role?.id) == null){
-        return ;
+    if (msg.member?.roles.cache.find(r => r.id == role?.id) == null) {
+        return;
     }
-    
+
     let lastTalkThreashold: Date | null = null;
 
-    if(msg.content.split(' ').length > 1){
+    if (msg.content.split(' ').length > 1) {
         const rawTime = msg.content.split(' ').slice(1).join(' ');
         const ms = getSeconds(rawTime) * 1000;
         lastTalkThreashold = new Date();
@@ -279,66 +279,66 @@ async function findStales(msg:Message&{guild:Guild}){
     const idle: string[] = [];
 
     const categories = await findCategories(msg.guild);
-    for(const parentCategory in categories){
+    for (const parentCategory in categories) {
         const subcategorys = categories[parentCategory];
-        for(const subcategory of subcategorys){
-            const channels: GuildChannel[] & {messages:MessageManager}[] = [];
+        for (const subcategory of subcategorys) {
+            const channels: GuildChannel[] & { messages: MessageManager }[] = [];
             subcategory.children.each(channel => {
                 let foundOnlyMentors = true;
                 channel.members.each(member => {
-                    if(member.user.id == bot.user?.id) return;
-                    if(member.roles.cache.find(r => r.id == role?.id) == null){
+                    if (member.user.id == bot.user?.id) return;
+                    if (member.roles.cache.find(r => r.id == role?.id) == null) {
                         foundOnlyMentors = false;
                     }
                 });
-                if(foundOnlyMentors){
+                if (foundOnlyMentors) {
                     onlyMentors.push(channel.toString());
-                }else if(lastTalkThreashold && hasMessages(channel) ) {
+                } else if (lastTalkThreashold && hasMessages(channel)) {
                     channels.push(channel);
                 }
             });
-            if(lastTalkThreashold){
-                for(const channel of channels){
-                    try{
-                        const messages = await channel.messages.fetch({limit: 1});
+            if (lastTalkThreashold) {
+                for (const channel of channels) {
+                    try {
+                        const messages = await channel.messages.fetch({ limit: 1 });
                         const m = messages.random();
-                        if(!m || m.createdTimestamp < lastTalkThreashold.getTime()){
+                        if (!m || m.createdTimestamp < lastTalkThreashold.getTime()) {
                             idle.push(channel.toString());
                         }
-                    }catch(err){
+                    } catch (err) {
                         log.error(err);
                     }
                 }
             }
         }
     }
-    if(onlyMentors.length > 0){
+    if (onlyMentors.length > 0) {
         await msg.channel.send(`Only ${role.name}:\n${onlyMentors.slice(0, Math.min(50, onlyMentors.length)).join('\n')}`);
     }
-    if(idle.length > 0){
+    if (idle.length > 0) {
         await msg.channel.send(`Idle since ${dateFormat(lastTalkThreashold, 'yyyy-mm-dd HH:MM')}:\n${idle.slice(0, Math.min(50, idle.length)).join('\n')}`);
     }
-    if(onlyMentors.length == 0 && idle.length == 0){
+    if (onlyMentors.length == 0 && idle.length == 0) {
         await msg.channel.send(`No stale channels found`);
     }
 }
 
-async function findUser(msg:Message&{guild:Guild}){
+async function findUser(msg: Message & { guild: Guild }) {
     let userID = msg.author.id;
     const mentionedUser = msg.mentions.users.random();
-    if(mentionedUser && msg.member?.roles.cache.find(role => role.name == MENTOR_ROLE)){
+    if (mentionedUser && msg.member?.roles.cache.find(role => role.name == MENTOR_ROLE)) {
         userID = mentionedUser.id;
     }
 
     const categories = await findCategories(msg.guild);
     const found: string[] = [];
-    for(const parentCategory in categories){
+    for (const parentCategory in categories) {
         const subcategorys = categories[parentCategory];
-        for(const subcategory of subcategorys){
-            const channels: GuildChannel[] & {messages:MessageManager}[] = [];
+        for (const subcategory of subcategorys) {
+            const channels: GuildChannel[] & { messages: MessageManager }[] = [];
             subcategory.children.filter(channel => channel.permissionOverwrites.find((perm, key) => key == userID) != null).each(c => channels.push(c));
-            for(const c of channels){
-                if(found.length < 50){
+            for (const c of channels) {
+                if (found.length < 50) {
                     found.push(c.toString());
                 }
             }
@@ -347,54 +347,54 @@ async function findUser(msg:Message&{guild:Guild}){
     await msg.channel.send(`Found: ${found.join(' ')}`);
 }
 
-async function rename(msg:Message&{guild:Guild}){
+async function rename(msg: Message & { guild: Guild }) {
     const parts = msg.content.split(' ');
-    if(parts.length < 3){
+    if (parts.length < 3) {
         await msg.channel.send(`Please format the request in \`!mentor <NEW_ERA> <NEW_NATION>\``);
         return;
     }
 
     const mentorRole = await findRole(msg, MENTOR_ROLE);
-    if(!mentorRole) {
+    if (!mentorRole) {
         return;
     }
 
     const channel = msg.channel as GuildChannel;
     const categories = await findCategories(msg.guild);
     let isInCategory = false;
-    for(const group in categories){
-        for(const category of categories[group]){
-            if(channel.parentID == category.id){
+    for (const group in categories) {
+        for (const category of categories[group]) {
+            if (channel.parentID == category.id) {
                 isInCategory = true;
             }
         }
     }
-    if(!isInCategory){
+    if (!isInCategory) {
         log.debug(`Requested to rename channel not in category: ${channel.name}`);
         return;
     }
     const targetChannel = msg.channel as GuildChannel;
-    if(channel.permissionOverwrites.find((perm, key) => key == msg.author.id) == null){
+    if (channel.permissionOverwrites.find((perm, key) => key == msg.author.id) == null) {
         log.debug(`Non owner requested rename of un authorized channel. ${msg.member?.displayName}, ${targetChannel.name}`);
         return;
     }
 
     const categoryName = parts[1].toLowerCase();
-    if(!categories[categoryName]){
+    if (!categories[categoryName]) {
         await msg.channel.send(`Unrecognized era! Recognized Eras: ${keys(categories).join(' ')}`);
         return;
     }
-    let category:CategoryChannel | null = null;
-    for(const channel of categories[categoryName]){
-        if(channel.children.size < 50){
+    let category: CategoryChannel | null = null;
+    for (const channel of categories[categoryName]) {
+        if (channel.children.size < 50) {
             category = channel;
             break;
         }
     }
-    if(category == null){
+    if (category == null) {
         category = await extendCategory(categoryName, msg);
     }
-    if(category == null){
+    if (category == null) {
         await msg.channel.send(`Out of room for ${categoryName}! Ask some one to make more!`);
         return;
     }
@@ -408,14 +408,14 @@ async function rename(msg:Message&{guild:Guild}){
     await msg.channel.send(`Renamed to ${targetChannel.toString()}`);
 }
 
-async function DRN(msg: Message&{guild:Guild}){
+async function DRN(msg: Message & { guild: Guild }) {
     const role = await findRole(msg, MENTOR_ROLE);
-    if(!role){
+    if (!role) {
         return;
     }
     const isMentor = msg.member?.roles.cache.find(r => r.id == role.id) != null;
     const targetChannel = msg.channel as GuildChannel;
-    if(!isMentor && targetChannel.permissionOverwrites.find((perm, key) => key == msg.author.id) == null){
+    if (!isMentor && targetChannel.permissionOverwrites.find((perm, key) => key == msg.author.id) == null) {
         log.info(`Insufficient permissions to use DRN here`);
         return;
     }
@@ -423,95 +423,95 @@ async function DRN(msg: Message&{guild:Guild}){
     const DRN_REGEX = /(?<ATK>\d+)\s*vs?\s*(?<DEF>\d+)/;
     const match = DRN_REGEX.exec(msg.content);
 
-    function drn(depth: number){
-        if(depth > 20) return 10000;
+    function drn(depth: number) {
+        if (depth > 20) return 10000;
         const roll = Math.ceil(Math.random() * 6);
-        if(roll == 6){
+        if (roll == 6) {
             return 5 + drn(depth++);
         }
         return roll;
     }
 
-    if(match && match?.groups){
+    if (match && match?.groups) {
         const atk = Number(match.groups['ATK']);
         const def = Number(match.groups['DEF']);
-        const result = {wins: 0, losses: 0, values: [] as number[]};
+        const result = { wins: 0, losses: 0, values: [] as number[] };
         let count = 0;
         let sum = 0;
-        while(count++ < 1000){
+        while (count++ < 1000) {
             const atkDrn = drn(0) + drn(0) + atk;
             const defDrn = drn(0) + drn(0) + def;
             const roll = atkDrn - defDrn;
             sum += roll;
             result.values.push(roll);
-            if(roll > 0){
+            if (roll > 0) {
                 result.wins++;
-            }else{
+            } else {
                 result.losses++;
             }
         }
         result.values = result.values.sort((a, b) => a - b);
         const rolls = result.wins + result.losses;
-        
+
         const zero: number[] = [];
         const breakdown: number[] = [];
         const granularity = 30;
-        for(let i = 0; i < granularity; i++){
+        for (let i = 0; i < granularity; i++) {
             zero[i] = 0;
-            let index = Math.floor((i/granularity) * result.values.length);
+            let index = Math.floor((i / granularity) * result.values.length);
             //exclude the lowest and highest rolls
             index = Math.max(10, Math.min(result.values.length - 10, index));
             breakdown[i] = result.values[index];
         }
-        
+
         const table = new AsciiTable(`${atk} vs ${def}`);
         table.addRow('Rolls', rolls);
         table.addRow('Wins', result.wins);
         table.addRow('Losses', result.losses);
-        table.addRow('Avg', (sum/count).toFixed(2));
-        table.addRow('Win %', ((result.wins/rolls)*100).toFixed(2));
+        table.addRow('Avg', (sum / count).toFixed(2));
+        table.addRow('Win %', ((result.wins / rolls) * 100).toFixed(2));
 
         const tableStr = table.toString().split('\n') as string[];
-        const graph = AsciiChart.plot([zero, breakdown], {height: tableStr.length}).split('\n') as string[];
+        const graph = AsciiChart.plot([zero, breakdown], { height: tableStr.length }).split('\n') as string[];
         const output: string[] = [];
         output.push('```');
-        for(let i = 0; i < tableStr.length; i++){
+        for (let i = 0; i < tableStr.length; i++) {
             output.push(`${tableStr[i]} ${graph[i]}`);
         }
         output.push('```');
         await msg.channel.send(`${output.join('\n')}`);
-    }else{
-       await  msg.channel.send(`Unrecognized input`);
+    } else {
+        await msg.channel.send(`Unrecognized input`);
     }
 }
 
-async function bulkApplyStudentTag(msg: Message & {guild:Guild}){
+async function bulkApplyStudentTag(msg: Message & { guild: Guild }) {
     const mentorRole = await findRole(msg, MENTOR_ROLE);
     const studentRole = await findRole(msg, STUDENT_ROLE);
-    if(!mentorRole || !studentRole){
+    if (!mentorRole || !studentRole) {
         return;
     }
     let changes = 0;
     const categories = await findCategories(msg.guild);
     const userMap = {};
     log.debug(`Found categories ${JSON.stringify(categories)}`);
-    for(const parentCategory in categories){
+    for (const parentCategory in categories) {
         log.debug(`Checking parent category ${parentCategory}`);
         const subcategorys = categories[parentCategory];
-        for(const subcategory of subcategorys){
+        for (const subcategory of subcategorys) {
             log.debug(`Checking sub category ${subcategory.name}`);
-            const students: GuildMember[]= [];
+            const students: GuildMember[] = [];
             subcategory.children.each(channel => {
                 log.debug(`Checking channel ${channel.name}`);
                 channel.members.each(member => {
-                    if(member.user.id == bot.user?.id) return;
-                    if(member.roles.cache.find(r => r.id == mentorRole?.id) == null){
+                    if (member.user.id == bot.user?.id) return;
+                    if (member.roles.cache.find(r => r.id == mentorRole?.id) == null) {
                         students.push(member);
                     }
                 });
             });
-            for(const student of students){
-                if(!userMap[student.id]){
+            for (const student of students) {
+                if (!userMap[student.id]) {
                     await student.roles.add(studentRole);
                     changes++;
                     userMap[student.id] = true;
@@ -527,55 +527,62 @@ bot.on('ready', () => {
 });
 
 bot.on('message', async msg => {
-    try{
-        if(!msg.content.startsWith(`${COMMAND_PREFIX}`)){
+    try {
+        if (!msg.content.startsWith(`${COMMAND_PREFIX}`)) {
             return;
         }
         const command = msg.content.substr(COMMAND_PREFIX.length);
-        if(hasGuild(msg)){
+        if (hasGuild(msg)) {
             const mentorCMD = `${MENTOR_ROLE}`.toLowerCase();
             log.info(`processing ${command} from ${msg.member?.displayName}`);
-            switch(command.split(' ')[0].toLowerCase()){
-                case 'init':
-                    await initGuild(msg);
-                    break;
-                case mentorCMD:
-                    await mentor(msg);
-                    break;
-                case 'rename':
-                    await rename(msg);
-                    break;
-                case 'find':
-                    await findUser(msg);
-                    break;
-                case 'stales':
-                    await findStales(msg);
-                    break;
-                case 'drn':
-                    await DRN(msg);
-                    break;
-                case 'bulkapplystudenttag':
-                    await bulkApplyStudentTag(msg);
-                    break;
-                case 'help':{
-                    const cmds: string[] = [];
-                    cmds.push('Commands');
-                    cmds.push('```');
-                    cmds.push(`${COMMAND_PREFIX}${mentorCMD} <category> <nation> -- create a ${mentorCMD} channel for yourself`);
-                    cmds.push(`${COMMAND_PREFIX}rename <category> <nation> -- rename your ${mentorCMD} channel (must be done within your ${mentorCMD} channel)`);
-                    cmds.push(`${COMMAND_PREFIX}drn <number> vs <number> -- generate stats for an opposed 2drn vs 2drn check (only works in your ${mentorCMD} channel)`);
-                    cmds.push(`${COMMAND_PREFIX}find -- find your channel`);
-                    if(msg.member?.roles.cache.find(r => r.name == MENTOR_ROLE) != null){
-                        cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}find <@user> -- find ${mentorCMD} channel(s) for a user`);
-                        cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}stales <optional time: 1d> -- limit 50 channels`);
+            try {
+                await msg.react('🤔');
+                switch (command.split(' ')[0].toLowerCase()) {
+                    case 'init':
+                        await initGuild(msg);
+                        break;
+                    case mentorCMD:
+                        await mentor(msg);
+                        break;
+                    case 'rename':
+                        await rename(msg);
+                        break;
+                    case 'find':
+                        await findUser(msg);
+                        break;
+                    case 'stales':
+                        await findStales(msg);
+                        break;
+                    case 'drn':
+                        await DRN(msg);
+                        break;
+                    case 'bulkapplystudenttag':
+                        await bulkApplyStudentTag(msg);
+                        break;
+                    case 'help': {
+                        const cmds: string[] = [];
+                        cmds.push('Commands');
+                        cmds.push('```');
+                        cmds.push(`${mentorCMD} <category> <nation> -- create a ${mentorCMD} channel for yourself`);
+                        cmds.push(`${COMMAND_PREFIX}rename <category> <nation> -- rename your ${mentorCMD} channel (must be done within your ${mentorCMD} channel)`);
+                        cmds.push(`${COMMAND_PREFIX}drn <number> vs <number> -- generate stats for an opposed 2drn vs 2drn check (only works in your ${mentorCMD} channel)`);
+                        cmds.push(`${COMMAND_PREFIX}find -- find your channel`);
+                        if (msg.member?.roles.cache.find(r => r.name == MENTOR_ROLE) != null) {
+                            cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}fine <@user> -- find ${mentorCMD} channel(s) for a user`);
+                            cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}stales <optional time: 1d> -- limit 50 channels`);
+                        }
+                        cmds.push('```');
+                        await msg.channel.send(`${cmds.join('\n')}`);
                     }
-                    cmds.push('```');
-                    await msg.channel.send(`${cmds.join('\n')}`);
                 }
+                await msg.react('💯');
+            } catch (e) {
+                await msg.react('🤯');
+                throw e;
             }
             log.debug(`finished processing ${command} from ${msg.member?.displayName}`);
         }
-    }catch(err){
+    } catch (err) {
         log.error(err);
     }
 });
