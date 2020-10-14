@@ -6,9 +6,10 @@ require('source-map-support').install();
 import AsciiTable from 'ascii-table';
 import AsciiChart from 'asciichart';
 import dateFormat from 'dateformat';
-import { CategoryChannel, Client, Guild, GuildChannel, GuildMember, Message, MessageManager, MessageReaction, Permissions } from 'discord.js';
+import { CategoryChannel, Client, Guild, GuildChannel, GuildMember, Message, MessageManager, Permissions, TextChannel } from 'discord.js';
 import { keys } from 'lodash';
 import { getLogger, shutdown } from 'log4js';
+import fs from 'fs/promises';
 
 const log = getLogger();
 
@@ -20,6 +21,9 @@ const STUDENT_ROLE = process.env.STUDENT_ROLE || "Student" as string;
 const MENTOR_ROLE = process.env.MENTOR_ROLE || "Mentor" as string;
 const MENTOR_CATEGORY = process.env.MENTOR_CATEGORY || "Teaching Channel" as string;
 const COMMAND_PREFIX = process.env.COMMAND_PREFIX || "!" as string;
+const CHANNELS_PER_STUDENT = Number(process.env.CHANNELS_PER_STUDENT || 5);
+let MENTOR_CHANNEL_GREETING = "";
+fs.readFile("res/mentor_greeting.txt", {encoding: 'utf-8'}).then(txt => MENTOR_CHANNEL_GREETING = txt).catch(er => {throw new Error(er);});
 
 require('./ValidateEnv.js').validate();
 
@@ -125,8 +129,6 @@ async function extendCategory(categoryName: string, msg: Message & { guild: Guil
     return null;
 }
 
-// async function extendNewCategory
-
 async function findRole(msg: Message & { guild: Guild }, roleName: string) {
     const mentorRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == roleName);
     if (!mentorRole) {
@@ -145,8 +147,9 @@ function hasMessages(obj: any): obj is { messages: MessageManager } {
 }
 
 async function mentor(msg: Message & { guild: Guild }) {
-    if (msg.member?.roles.cache.find(role => role.name == STUDENT_ROLE)) {
-        await msg.channel.send(`You are already a ${STUDENT_ROLE}!`);
+    const existingChannels = findUser(msg, true);
+    if ((await existingChannels).length > CHANNELS_PER_STUDENT) {
+        await msg.channel.send(`You are at capacity!`);
         await findUser(msg);
         return;
     }
@@ -209,6 +212,7 @@ async function mentor(msg: Message & { guild: Guild }) {
         });
     await msg.member?.roles.add(studentRole);
     await msg.channel.send(`Created ${mentorChannel.toString()}`);
+    await mentorChannel.send(MENTOR_CHANNEL_GREETING.replace('@name', msg.member?.toString() || `${STUDENT_ROLE}`));
 }
 
 async function initGuild(msg: Message & { guild: Guild }) {
@@ -323,7 +327,7 @@ async function findStales(msg: Message & { guild: Guild }) {
     }
 }
 
-async function findUser(msg: Message & { guild: Guild }) {
+async function findUser(msg: Message & { guild: Guild }, quiet?: boolean) {
     let userID = msg.author.id;
     const mentionedUser = msg.mentions.users.random();
     if (mentionedUser && msg.member?.roles.cache.find(role => role.name == MENTOR_ROLE)) {
@@ -344,7 +348,10 @@ async function findUser(msg: Message & { guild: Guild }) {
             }
         }
     }
-    await msg.channel.send(`Found: ${found.join(' ')}`);
+    if(!quiet){
+        await msg.channel.send(`Found: ${found.join(' ')}`);
+    }
+    return found;
 }
 
 async function rename(msg: Message & { guild: Guild }) {
@@ -522,6 +529,47 @@ async function bulkApplyStudentTag(msg: Message & { guild: Guild }) {
     await msg.channel.send(`Added ${studentRole.toString()} to ${changes} users`);
 }
 
+async function findStudents(msg:Message & {guild: Guild}) {
+    const role = await findRole(msg, MENTOR_ROLE);
+    if (!role) {
+        return;
+    }
+
+    if (msg.member?.roles.cache.find(r => r.id == role?.id) == null) {
+        return;
+    }
+    const categories = await findCategories(msg.guild);
+    const channels: { [k : string]:string } = {};
+    for (const parentCategory in categories) {
+        const subcategorys = categories[parentCategory];
+        for (const subcategory of subcategorys) {
+            for(const c of subcategory.children.values()){
+                if(msg.guild.me && !c.permissionsFor(msg.guild.me)?.has('VIEW_CHANNEL')) continue;
+                const channel = (c as TextChannel);
+                try{
+                    const msgs = await channel.messages.fetch({ limit: 5 });
+                    let found = false;
+                    for(const m of msgs.values()){
+                        if(m.member?.roles.cache.find(r => r.id == role?.id) != null){
+                            found = true;
+                            break;
+                        }
+                    }
+                    if(!found){
+                        channels[c.id] = c.toString();
+                    }
+                }catch(er){
+                    log.error(`Error fetching channel messages ${channel.name} ${er}`);
+                }
+                if(Object.values(channels).length >= 50) break;
+            }
+            if(Object.values(channels).length >= 50) break;
+        }
+        if(Object.values(channels).length >= 50) break;
+    }
+    await msg.channel.send(`Found ${Object.values(channels).length} channels\n${Object.values(channels).join('\n')}`);
+}
+
 bot.on('ready', () => {
     log.info(`Logged in as ${bot?.user?.tag}!`);
 });
@@ -534,9 +582,9 @@ bot.on('message', async msg => {
         const command = msg.content.substr(COMMAND_PREFIX.length);
         if (hasGuild(msg)) {
             const mentorCMD = `${MENTOR_ROLE}`.toLowerCase();
-            log.info(`processing ${command} from ${msg.member?.displayName}`);
+            log.info(`processing ${command} from ${msg.member?.displayName} in ${msg.channel.name}`);
+            const thinkies = await msg.react('🤔');
             try {
-                await msg.react('🤔');
                 switch (command.split(' ')[0].toLowerCase()) {
                     case 'init':
                         await initGuild(msg);
@@ -556,6 +604,9 @@ bot.on('message', async msg => {
                     case 'drn':
                         await DRN(msg);
                         break;
+                    case 'findstudents':
+                        await findStudents(msg);
+                        break;
                     case 'bulkapplystudenttag':
                         await bulkApplyStudentTag(msg);
                         break;
@@ -568,6 +619,7 @@ bot.on('message', async msg => {
                         cmds.push(`${COMMAND_PREFIX}drn <number> vs <number> -- generate stats for an opposed 2drn vs 2drn check (only works in your ${mentorCMD} channel)`);
                         cmds.push(`${COMMAND_PREFIX}find -- find your channel`);
                         if (msg.member?.roles.cache.find(r => r.name == MENTOR_ROLE) != null) {
+                            cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}findstudents -- find ${mentorCMD} channel(s) where a mentor hasn't talked in the last five messages`);
                             cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}fine <@user> -- find ${mentorCMD} channel(s) for a user`);
                             cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}stales <optional time: 1d> -- limit 50 channels`);
                         }
@@ -579,11 +631,13 @@ bot.on('message', async msg => {
             } catch (e) {
                 await msg.react('🤯');
                 throw e;
+            }finally{
+                await thinkies.remove();
             }
             log.debug(`finished processing ${command} from ${msg.member?.displayName}`);
         }
     } catch (err) {
-        log.error(err);
+        log.error(`Error handling command: ${err}`);
     }
 });
 
