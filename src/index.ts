@@ -164,7 +164,7 @@ async function mentor(msg: Message & { guild: Guild }) {
 
     const parts = msg.content.split(' ');
     if (parts.length < 3) {
-        await msg.channel.send(`Please format the request in \`!mentor <CATEGORY> <NATION>\``);
+        await msg.channel.send(`Please format the request in \`${COMMAND_PREFIX}mentor <CATEGORY> <NATION>\``);
         return;
     }
     const categoryName = parts[1].toLowerCase();
