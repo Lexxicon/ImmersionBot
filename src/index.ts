@@ -180,7 +180,7 @@ async function mentor(msg: Message & { guild: Guild }) {
     }
     if (category == null) {
         category = await extendCategory(categoryName, msg);
-        if (categoryName == null) {
+        if (category == null) {
             await msg.channel.send(`Out of room for ${categoryName}! Ask someone to make more!`);
             return;
         }
