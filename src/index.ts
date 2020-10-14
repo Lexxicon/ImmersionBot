@@ -528,7 +528,7 @@ bot.on('ready', () => {
 
 bot.on('message', async msg => {
     try {
-        if (!msg.content.startsWith(`${COMMAND_PREFIX}`)) {
+        if (!msg.content.startsWith(`${COMMAND_PREFIX}`) || msg.channel.type == 'dm') {
             return;
         }
         const command = msg.content.substr(COMMAND_PREFIX.length);
