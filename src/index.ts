@@ -1,3 +1,4 @@
+
 process.env.LOG4JS_CONFIG = process.env.LOG4JS_CONFIG || "res/log4js.json";
 
 require('dotenv').config();
@@ -13,50 +14,9 @@ import fs from 'fs/promises';
 
 const log = getLogger();
 
-log.info(``);
-log.info(`-------------- Application Starting ${new Date()} --------------`);
-log.info(``);
-
-const STUDENT_ROLE = process.env.STUDENT_ROLE || "Student" as string;
-const MENTOR_ROLE = process.env.MENTOR_ROLE || "Mentor" as string;
-const MENTOR_CATEGORY = process.env.MENTOR_CATEGORY || "Teaching Channel" as string;
-const COMMAND_PREFIX = process.env.COMMAND_PREFIX || "!" as string;
-const CHANNELS_PER_STUDENT = Number(process.env.CHANNELS_PER_STUDENT || 5);
-let MENTOR_CHANNEL_GREETING = "";
-fs.readFile("res/mentor_greeting.txt", {encoding: 'utf-8'}).then(txt => MENTOR_CHANNEL_GREETING = txt).catch(er => {throw new Error(er);});
-
-require('./ValidateEnv.js').validate();
-
-
-const bot = new Client();
-const TOKEN = process.env.TOKEN;
-
-export function getDiscordBot() {
-    return bot;
-}
-
 function cleanup() {
     log.info('Goodbye');
     shutdown();
-}
-
-
-const SEC_IN_MIN = 60;
-const SEC_IN_HOUR = SEC_IN_MIN * 60;
-const SEC_IN_DAY = SEC_IN_HOUR * 24;
-
-function getSeconds(str: string) {
-    if (str.startsWith('-')) throw `Negative times aren't allowed! ${str}`;
-    let seconds = 0;
-    const days = str.match(/(\d+)\s*d/);
-    const hours = str.match(/(\d+)\s*h/);
-    const minutes = str.match(/(\d+)\s*m/);
-    const rawSeconds = str.match(/(\d+)\s*s/);
-    if (days) { seconds += parseInt(days[1]) * SEC_IN_DAY; }
-    if (hours) { seconds += parseInt(hours[1]) * SEC_IN_HOUR; }
-    if (minutes) { seconds += parseInt(minutes[1]) * SEC_IN_MIN; }
-    if (rawSeconds) { seconds += parseInt(rawSeconds[1]); }
-    return seconds;
 }
 
 // do app specific cleaning before exiting
@@ -82,6 +42,50 @@ process.on('uncaughtException', function (e) {
 process.on('unhandledRejection', (reason: any, p) => {
     log.error(`Unhandled Rejection at: Promise ${p} reason: ${reason} stack: ${reason?.stack}`);
 });
+
+
+log.info(``);
+log.info(`-------------- Application Starting ${new Date()} --------------`);
+log.info(``);
+
+const STUDENT_ROLE = process.env.STUDENT_ROLE || "Student" as string;
+const MENTOR_ROLE = process.env.MENTOR_ROLE || "Mentor" as string;
+const MENTOR_CATEGORY = process.env.MENTOR_CATEGORY || "Teaching Channel" as string;
+const COMMAND_PREFIX = process.env.COMMAND_PREFIX || "!" as string;
+const CHANNELS_PER_STUDENT = Number(process.env.CHANNELS_PER_STUDENT || 5);
+let MENTOR_CHANNEL_GREETING = "";
+fs.readFile("res/mentor_greeting.txt", {encoding: 'utf-8'}).then(txt => MENTOR_CHANNEL_GREETING = txt).catch(er => {throw new Error(er);});
+require('./ValidateEnv.js').validate();
+
+const BANNED_PREFIXES: string[] = require('../res/banned_prefixes.json').values;
+if(BANNED_PREFIXES.indexOf(COMMAND_PREFIX) != -1){
+    throw new Error(`Requested command prefix is disallowed! ${COMMAND_PREFIX}`);
+}
+const bot = new Client();
+const TOKEN = process.env.TOKEN;
+
+export function getDiscordBot() {
+    return bot;
+}
+
+
+const SEC_IN_MIN = 60;
+const SEC_IN_HOUR = SEC_IN_MIN * 60;
+const SEC_IN_DAY = SEC_IN_HOUR * 24;
+
+function getSeconds(str: string) {
+    if (str.startsWith('-')) throw `Negative times aren't allowed! ${str}`;
+    let seconds = 0;
+    const days = str.match(/(\d+)\s*d/);
+    const hours = str.match(/(\d+)\s*h/);
+    const minutes = str.match(/(\d+)\s*m/);
+    const rawSeconds = str.match(/(\d+)\s*s/);
+    if (days) { seconds += parseInt(days[1]) * SEC_IN_DAY; }
+    if (hours) { seconds += parseInt(hours[1]) * SEC_IN_HOUR; }
+    if (minutes) { seconds += parseInt(minutes[1]) * SEC_IN_MIN; }
+    if (rawSeconds) { seconds += parseInt(rawSeconds[1]); }
+    return seconds;
+}
 
 async function findCategories(guild: Guild) {
     const roleManager = await guild.roles.fetch();
@@ -576,7 +580,7 @@ bot.on('ready', () => {
 
 bot.on('message', async msg => {
     try {
-        if (!msg.content.startsWith(`${COMMAND_PREFIX}`) || msg.channel.type == 'dm') {
+        if (!msg.content.startsWith(`${COMMAND_PREFIX}`) || msg.channel.type == 'dm' || BANNED_PREFIXES.filter(ban => msg.content.startsWith(ban)).length > 0) {
             return;
         }
         const command = msg.content.substr(COMMAND_PREFIX.length);
@@ -625,7 +629,12 @@ bot.on('message', async msg => {
                         }
                         cmds.push('```');
                         await msg.channel.send(`${cmds.join('\n')}`);
+                        break;
                     }
+                    default:
+                        await msg.channel.send(`Unrecognized command! try ${COMMAND_PREFIX}help for a list of commands`);
+                        await msg.react('👎');
+                        return;
                 }
                 await msg.react('💯');
             } catch (e) {
