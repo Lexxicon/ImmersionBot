@@ -618,7 +618,7 @@ bot.on('message', async msg => {
                         const cmds: string[] = [];
                         cmds.push('Commands');
                         cmds.push('```');
-                        cmds.push(`${mentorCMD} <category> <nation> -- create a ${mentorCMD} channel for yourself`);
+                        cmds.push(`${COMMAND_PREFIX}${mentorCMD} <category> <nation> -- create a ${mentorCMD} channel for yourself`);
                         cmds.push(`${COMMAND_PREFIX}rename <category> <nation> -- rename your ${mentorCMD} channel (must be done within your ${mentorCMD} channel)`);
                         cmds.push(`${COMMAND_PREFIX}drn <number> vs <number> -- generate stats for an opposed 2drn vs 2drn check (only works in your ${mentorCMD} channel)`);
                         cmds.push(`${COMMAND_PREFIX}find -- find your channel`);
