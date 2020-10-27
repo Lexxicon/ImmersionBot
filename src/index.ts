@@ -480,13 +480,12 @@ async function DRN(msg: Message & { guild: Guild }) {
         }
 
         const table = new AsciiTable(`${atk} vs ${def}`);
-        table.addRow('Rolls', rolls);
-        table.addRow('Wins', result.wins);
-        table.addRow('Losses', result.losses);
         table.addRow('Avg', (sum / count).toFixed(2));
         table.addRow('Win %', ((result.wins / rolls) * 100).toFixed(2));
+        table.addRow('50% win',Math.ceil(logBase(.5, (result.wins / rolls))));
+        table.addRow('75% win',Math.ceil(logBase(.75, (result.wins / rolls))));
         table.addRow('90% win',Math.ceil(logBase(.9, (result.wins / rolls))));
-        table.addRow('99% win',Math.ceil(logBase(.99, (result.wins / rolls))));
+        table.addRow('95% win',Math.ceil(logBase(.95, (result.wins / rolls))));
 
         const tableStr = table.toString().split('\n') as string[];
         const graph = AsciiChart.plot([zero, breakdown], { height: tableStr.length }).split('\n') as string[];
