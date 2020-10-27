@@ -87,6 +87,10 @@ function getSeconds(str: string) {
     return seconds;
 }
 
+function logBase(x, y){
+    return Math.log(y) / Math.log(x);
+}
+
 async function findCategories(guild: Guild) {
     const roleManager = await guild.roles.fetch();
     const categoryRole = roleManager.cache.find(role => role.name == MENTOR_CATEGORY);
@@ -481,13 +485,15 @@ async function DRN(msg: Message & { guild: Guild }) {
         table.addRow('Losses', result.losses);
         table.addRow('Avg', (sum / count).toFixed(2));
         table.addRow('Win %', ((result.wins / rolls) * 100).toFixed(2));
+        table.addRow('90% win',Math.ceil(logBase(.9, (result.wins / rolls))));
+        table.addRow('99% win',Math.ceil(logBase(.99, (result.wins / rolls))));
 
         const tableStr = table.toString().split('\n') as string[];
         const graph = AsciiChart.plot([zero, breakdown], { height: tableStr.length }).split('\n') as string[];
         const output: string[] = [];
         output.push('```');
         for (let i = 0; i < tableStr.length; i++) {
-            output.push(`${tableStr[i]} ${graph[i]}`);
+            output.push(`${tableStr[i]} ${graph[i]}`.trimRight());
         }
         output.push('```');
         await msg.channel.send(`${output.join('\n')}`);
