@@ -391,6 +391,7 @@ async function rename(msg: Message & { guild: Guild }) {
     const targetChannel = msg.channel as GuildChannel;
     if (channel.permissionOverwrites.find((perm, key) => key == msg.author.id) == null) {
         log.debug(`Non owner requested rename of un authorized channel. ${msg.member?.displayName}, ${targetChannel.name}`);
+        await msg.channel.send(`Only channel owners may use this command`);
         return;
     }
 
