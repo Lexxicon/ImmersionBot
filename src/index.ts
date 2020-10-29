@@ -50,9 +50,11 @@ log.info(``);
 
 const STUDENT_ROLE = process.env.STUDENT_ROLE || "Student" as string;
 const MENTOR_ROLE = process.env.MENTOR_ROLE || "Mentor" as string;
+const SUB_ROLE = process.env.SUB_ROLE || "BELOVED SUBS" as string;
 const MENTOR_CATEGORY = process.env.MENTOR_CATEGORY || "Teaching Channel" as string;
 const COMMAND_PREFIX = process.env.COMMAND_PREFIX || "!" as string;
 const CHANNELS_PER_STUDENT = Number(process.env.CHANNELS_PER_STUDENT || 5);
+
 let MENTOR_CHANNEL_GREETING = "";
 fs.readFile("res/mentor_greeting.txt", {encoding: 'utf-8'}).then(txt => MENTOR_CHANNEL_GREETING = txt).catch(er => {throw new Error(er);});
 require('./ValidateEnv.js').validate();
@@ -67,7 +69,6 @@ const TOKEN = process.env.TOKEN;
 export function getDiscordBot() {
     return bot;
 }
-
 
 const SEC_IN_MIN = 60;
 const SEC_IN_HOUR = SEC_IN_MIN * 60;
@@ -138,12 +139,12 @@ async function extendCategory(categoryName: string, msg: Message & { guild: Guil
 }
 
 async function findRole(msg: Message & { guild: Guild }, roleName: string) {
-    const mentorRole = (await msg.guild.roles.fetch()).cache.find(role => role.name == roleName);
-    if (!mentorRole) {
+    const role = (await msg.guild.roles.fetch()).cache.find(role => role.name == roleName);
+    if (!role) {
         await msg.channel.send(`Server has no ${roleName} role!`);
         return;
     }
-    return mentorRole;
+    return role;
 }
 
 function hasGuild(obj: any): obj is { guild: Guild } {
@@ -249,6 +250,11 @@ async function initGuild(msg: Message & { guild: Guild }) {
         await msg.channel.send(`Created ${mentorRole.toString()} as mentor role`);
         changed = true;
         await msg.guild.me?.roles.add(mentorRole);
+    }
+    if (!roleManager.cache.find(role => role.name == SUB_ROLE)) {
+        const subRole = await roleManager.create({ data: { name: SUB_ROLE, mentionable: false, permissions: 0 } });
+        await msg.channel.send(`Created ${subRole.toString()} as sub role`);
+        changed = true;
     }
     let categoryRole = roleManager.cache.find(role => role.name == MENTOR_CATEGORY);
     if (!categoryRole) {
@@ -429,12 +435,6 @@ async function DRN(msg: Message & { guild: Guild }) {
     if (!role) {
         return;
     }
-    const isMentor = msg.member?.roles.cache.find(r => r.id == role.id) != null;
-    const targetChannel = msg.channel as GuildChannel;
-    if (!isMentor && targetChannel.permissionOverwrites.find((perm, key) => key == msg.author.id) == null) {
-        log.info(`Insufficient permissions to use DRN here`);
-        return;
-    }
 
     const DRN_REGEX = /(?<ATK>\d+)\s*vs?\s*(?<DEF>\d+)/;
     const match = DRN_REGEX.exec(msg.content);
@@ -580,6 +580,48 @@ async function findStudents(msg:Message & {guild: Guild}) {
     await msg.channel.send(`Found ${Object.values(channels).length} channels\n${Object.values(channels).join('\n')}`);
 }
 
+async function addSubRole(msg: Message & {guild: Guild}){
+    const role = await findRole(msg, SUB_ROLE);
+    if (!role) {
+        await msg.channel.send(`Failed to find role ${SUB_ROLE}`);
+        return;
+    }
+
+    if(!msg.member){
+        await msg.channel.send(`This only works in guild channels!`);
+        return;
+    }
+
+    if(msg.member.roles.cache.find(r => r.id == role.id) != null){
+        await msg.channel.send(`Looks like I already love you as much as I can! I can only love you more if you don't have the ${SUB_ROLE} role!`);
+    }
+
+    await msg.member.roles.add(role);
+    await msg.channel.send(`Now I love you the maxium amount! Thank you for being an ${SUB_ROLE}`);
+    return;
+}
+
+async function removeSubRole(msg: Message & {guild: Guild}){
+    const role = await findRole(msg, SUB_ROLE);
+    if (!role) {
+        await msg.channel.send(`Failed to find role ${SUB_ROLE}`);
+        return;
+    }
+
+    if(!msg.member){
+        await msg.channel.send(`This only works in guild channels!`);
+        return;
+    }
+
+    if(msg.member.roles.cache.find(r => r.id == role.id) == null){
+        await msg.channel.send(`Looks like you've already left me! You can only leave me to my sorrows if you have the ${SUB_ROLE} role!`);
+    }
+
+    await msg.member.roles.remove(role);
+    await msg.channel.send(`You have left me! I'll try to remember the time when you were a ${SUB_ROLE}`);
+    return;
+}
+
 bot.on('ready', () => {
     log.info(`Logged in as ${bot?.user?.tag}!`);
 });
@@ -620,14 +662,22 @@ bot.on('message', async msg => {
                     case 'bulkapplystudenttag':
                         await bulkApplyStudentTag(msg);
                         break;
+                    case 'loveme':
+                        await addSubRole(msg);
+                        break;
+                    case 'leaveme':
+                        await removeSubRole(msg);
+                        break;
                     case 'help': {
                         const cmds: string[] = [];
                         cmds.push('Commands');
                         cmds.push('```');
                         cmds.push(`${COMMAND_PREFIX}${mentorCMD} <category> <nation> -- create a ${mentorCMD} channel for yourself`);
                         cmds.push(`${COMMAND_PREFIX}rename <category> <nation> -- rename your ${mentorCMD} channel (must be done within your ${mentorCMD} channel)`);
-                        cmds.push(`${COMMAND_PREFIX}drn <number> vs <number> -- generate stats for an opposed 2drn vs 2drn check (only works in your ${mentorCMD} channel)`);
+                        cmds.push(`${COMMAND_PREFIX}drn <number> vs <number> -- generate stats for an opposed 2drn vs 2drn check`);
                         cmds.push(`${COMMAND_PREFIX}find -- find your channel`);
+                        cmds.push(`${COMMAND_PREFIX}loveMe causes me to love you more (Gives you the ${SUB_ROLE} role)`);
+                        cmds.push(`${COMMAND_PREFIX}leaveMe because you don't love me anymore (Removes the ${SUB_ROLE} role)`);
                         if (msg.member?.roles.cache.find(r => r.name == MENTOR_ROLE) != null) {
                             cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}findStudents -- find ${mentorCMD} channel(s) where a mentor hasn't talked in the last five messages`);
                             cmds.push(`[${MENTOR_ROLE} only] ${COMMAND_PREFIX}find <@user> -- find ${mentorCMD} channel(s) for a user`);
