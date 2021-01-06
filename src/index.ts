@@ -674,7 +674,7 @@ bot.on('message', async msg => {
                         cmds.push('```');
                         cmds.push(`${COMMAND_PREFIX}${mentorCMD} <category> <nation> -- create a ${mentorCMD} channel for yourself`);
                         cmds.push(`${COMMAND_PREFIX}rename <category> <nation> -- rename your ${mentorCMD} channel (must be done within your ${mentorCMD} channel)`);
-                        cmds.push(`${COMMAND_PREFIX}drn <number> vs <number> -- generate stats for an opposed 2drn vs 2drn check`);
+                        cmds.push(`${COMMAND_PREFIX}drn <number_A> vs <number_B> -- generate stats for an opposed 2drn vs 2drn check - gives the success probability of A beating B by one or more`);
                         cmds.push(`${COMMAND_PREFIX}find -- find your channel`);
                         cmds.push(`${COMMAND_PREFIX}loveMe causes me to love you more (Gives you the ${SUB_ROLE} role)`);
                         cmds.push(`${COMMAND_PREFIX}leaveMe because you don't love me anymore (Removes the ${SUB_ROLE} role)`);
